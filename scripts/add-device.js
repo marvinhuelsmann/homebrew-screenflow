@@ -125,29 +125,23 @@ async function detectRasterScreen(svgContent) {
   return detectScreenFromBuffer(Buffer.from(match[1], 'base64'));
 }
 
-function detectCornerRadius(svgContent) {
-  // Pick the rect with the largest stroke-width (= main device frame, not decorative outline)
-  // Inner radius = rx - stroke-width/2
-  let bestSw = 0, bestInner = 0;
-  for (const m of svgContent.matchAll(/<rect([^>]+)\/>/g)) {
-    const attrs = m[1];
-    const rxM = attrs.match(/rx="([^"]+)"/);
-    const swM = attrs.match(/stroke-width="([^"]+)"/);
-    if (rxM && swM) {
-      const sw = parseFloat(swM[1]);
-      if (sw > bestSw) {
-        bestSw = sw;
-        bestInner = parseFloat(rxM[1]) - sw / 2;
-      }
-    }
+async function detectCornerRadiusFromBuffer(pngBuffer, screen) {
+  const { data, info } = await sharp(pngBuffer).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { width, channels } = info;
+  // Scan the leftmost screen column downward — corner curve ends where pixels go transparent
+  const x = screen.x;
+  for (let y = screen.y; y < screen.y + screen.h; y++) {
+    if (data[(y * width + x) * channels + 3] <= 10) return y - screen.y;
   }
-  return Math.round(bestInner);
+  return 0;
 }
 
 async function detectOverlayScreen(svgContent) {
   const pngBuffer = await sharp(Buffer.from(svgContent)).png().toBuffer();
   // Scan at 15% from left to avoid center notch/dynamic-island blocking the top boundary
-  return detectScreenFromBuffer(pngBuffer, 0.15);
+  const result = await detectScreenFromBuffer(pngBuffer, 0.15);
+  result.cornerRadius = await detectCornerRadiusFromBuffer(pngBuffer, result.screen);
+  return result;
 }
 
 // ── File updaters ─────────────────────────────────────────────────────────────
@@ -299,11 +293,9 @@ async function main() {
   } else {
     // Transparent SVG overlay (strokes/outlines on transparent background)
     frameType = 'overlay';
-    canvas = parseSvgCanvas(firstSvg);
     process.stdout.write('\nDetecting screen bounds from rendered SVG... ');
-    ({ canvas, screen } = await detectOverlayScreen(firstSvg));
+    ({ canvas, screen, cornerRadius } = await detectOverlayScreen(firstSvg));
     console.log('done');
-    cornerRadius = detectCornerRadius(firstSvg);
     console.log(`Frame type: overlay`);
     console.log(`Canvas: ${canvas.w} x ${canvas.h}`);
     console.log(`Screen: x=${screen.x} y=${screen.y} w=${screen.w} h=${screen.h}`);

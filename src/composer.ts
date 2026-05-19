@@ -5,7 +5,7 @@ import { FRAMES, DEFAULT_DEVICE, FrameSpec } from './frames';
 
 export type Format = 'svg' | 'png' | 'jpeg';
 
-export const DEVICES = Object.keys(FRAMES);
+export const DEVICES = Object.keys(FRAMES).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
 function resolveDevice(input: string): string {
   const id = input.toLowerCase().trim();

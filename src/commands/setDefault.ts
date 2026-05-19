@@ -7,7 +7,7 @@ export async function setDefaultAction(): Promise<void> {
 
   const device = await select({
     message: 'Default device:',
-    choices: Object.keys(FRAMES).map(id => ({
+    choices: Object.keys(FRAMES).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).map(id => ({
       value: id,
       description: Object.keys(FRAMES[id].colors).join(', '),
     })),

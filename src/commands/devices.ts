@@ -6,7 +6,7 @@ export function devicesAction(): void {
   const defaultDevice = config.device ?? DEFAULT_DEVICE;
 
   console.log('');
-  for (const [id, spec] of Object.entries(FRAMES)) {
+  for (const [id, spec] of Object.entries(FRAMES).sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))) {
     const colors = Object.keys(spec.colors).join(', ');
     const isDefault = id === defaultDevice;
     console.log(`  ${id}${isDefault ? ' (default)' : ''}`);
