@@ -66,6 +66,7 @@ screenflow --devices
 | Device | ID | Colors |
 |---|---|---|
 | iPhone 17 Pro | `iphone-17-pro` | `silver`, `deep-blue`, `cosmic-orange` |
+| iPad Pro | `ipad-pro-11` | `silver`, `silver-with-apple-pencil`, `space-gray`, `space-gray-with-apple-pencil` |
 
 ## Updating
 

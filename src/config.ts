@@ -18,6 +18,14 @@ export class Config {
   get device(): string | undefined { return this.data.device; }
   get color(): string | undefined { return this.data.color; }
 
+  print(): void {
+    console.log('');
+    console.log('  Saved defaults:');
+    console.log(`    Device  →  ${this.data.device ?? 'not set'}`);
+    console.log(`    Color   →  ${this.data.color ?? 'not set'}`);
+    console.log('');
+  }
+
   save(updates: ConfigData): void {
     this.data = { ...this.data, ...updates };
     fs.mkdirSync(path.dirname(Config.PATH), { recursive: true });

@@ -20,13 +20,16 @@ _screenflow() {
     iphone-17-pro)
       colors=('silver:Silver (default)' 'deep-blue:Deep Blue' 'cosmic-orange:Cosmic Orange')
       ;;
+    ipad-pro-11)
+      colors=('silver:Silver' 'silver-with-apple-pencil:Silver with Apple Pencil' 'space-gray:Space Gray' 'space-gray-with-apple-pencil:Space Gray with Apple Pencil')
+      ;;
     *)
-      colors=('silver:Silver (default)' 'deep-blue:Deep Blue' 'cosmic-orange:Cosmic Orange')
+      colors=('silver:Silver (default)')
       ;;
   esac
 
   local -a devices
-  devices=('iphone-17-pro:iPhone 17 Pro (default)')
+  devices=('iphone-17-pro:iPhone 17 Pro (default)' 'ipad-pro-11:iPad Pro 11"')
 
   _arguments \
     '(-v --version)'{-v,--version}'[output the version number]' \
