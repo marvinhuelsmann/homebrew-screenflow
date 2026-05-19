@@ -13,8 +13,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: master
 
       - name: Create GitHub release
         env:
@@ -30,15 +28,23 @@ jobs:
           echo "sha256=$SHA" >> "$GITHUB_OUTPUT"
           echo "url=$URL" >> "$GITHUB_OUTPUT"
 
-      - name: Update formula SHA256
-        run: |
-          sed -i "s|url \".*\"|url \"${{ steps.sha.outputs.url }}\"|" Formula/screenflow.rb
-          sed -i "s|sha256 \".*\"|sha256 \"${{ steps.sha.outputs.sha256 }}\"|" Formula/screenflow.rb
+      - name: Checkout homebrew tap
+        uses: actions/checkout@v4
+        with:
+          repository: marvinhuelsmann/homebrew-screenflow
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
 
-      - name: Commit updated formula
+      - name: Update formula in tap
         run: |
+          sed -i "s|url \".*\"|url \"${{ steps.sha.outputs.url }}\"|" homebrew-tap/Formula/screenflow.rb
+          sed -i "s|sha256 \".*\"|sha256 \"${{ steps.sha.outputs.sha256 }}\"|" homebrew-tap/Formula/screenflow.rb
+
+      - name: Commit and push formula
+        run: |
+          cd homebrew-tap
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Formula/screenflow.rb
           git commit -m "chore: update formula to ${{ github.ref_name }}"
-          git push origin HEAD:master
+          git push origin master
