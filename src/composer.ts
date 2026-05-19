@@ -117,14 +117,32 @@ async function composeRaster(
 
 // ── Overlay compositing (transparent SVG outline drawn on top) ───────────────
 
+async function roundedClip(img: Buffer, w: number, h: number, r: number): Promise<Buffer> {
+  const mask = Buffer.from(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">` +
+    `<rect width="${w}" height="${h}" rx="${r}" fill="white"/>` +
+    `</svg>`,
+  );
+  return sharp(img)
+    .composite([{ input: await sharp(mask).png().toBuffer(), blend: 'dest-in' }])
+    .png()
+    .toBuffer();
+}
+
 async function composeOverlay(
   inputPath: string, spec: FrameSpec, frameSvg: string,
   outputPath: string, format: Format,
 ): Promise<void> {
-  const screenshot = await sharp(inputPath)
+  const r = spec.cornerRadius ?? 0;
+
+  let screenshot = await sharp(inputPath)
     .resize(spec.screen.w, spec.screen.h, { fit: 'cover', position: 'top' })
     .png()
     .toBuffer();
+
+  if (r > 0) {
+    screenshot = await roundedClip(screenshot, spec.screen.w, spec.screen.h, r);
+  }
 
   if (format === 'svg') {
     const screenshotB64 = screenshot.toString('base64');

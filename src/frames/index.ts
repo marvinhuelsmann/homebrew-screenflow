@@ -3,6 +3,7 @@ export interface FrameSpec {
   screen: { x: number; y: number; w: number; h: number };
   colors: Record<string, string>; // color name → svg filename within device folder
   frameType?: 'vector' | 'raster' | 'overlay'; // default: 'vector'
+  cornerRadius?: number; // overlay frames only — clips screenshot to device's rounded screen
 }
 
 export const FRAMES: Record<string, FrameSpec> = {
@@ -39,6 +40,7 @@ export const FRAMES: Record<string, FrameSpec> = {
     canvas: { w: 430, h: 884 },
     screen: { x: 20, y: 21, w: 390, h: 842 },
     frameType: 'overlay',
+    cornerRadius: 52,
     colors: {
       'sierra-blue': 'sierra-blue.svg',
     },
@@ -47,6 +49,7 @@ export const FRAMES: Record<string, FrameSpec> = {
     canvas: { w: 423, h: 882 },
     screen: { x: 15, y: 16, w: 393, h: 850 },
     frameType: 'overlay',
+    cornerRadius: 58,
     colors: {
       'dessert-titanium': 'dessert-titanium.svg',
     },

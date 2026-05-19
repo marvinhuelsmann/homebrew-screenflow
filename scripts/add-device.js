@@ -125,6 +125,22 @@ async function detectRasterScreen(svgContent) {
   return detectScreenFromBuffer(Buffer.from(match[1], 'base64'));
 }
 
+function detectCornerRadius(svgContent) {
+  // Find all closed rects with both rx and stroke-width, pick the one with the largest rx
+  // Inner radius = rx - stroke-width/2
+  let maxInnerRx = 0;
+  for (const m of svgContent.matchAll(/<rect([^>]+)\/>/g)) {
+    const attrs = m[1];
+    const rxM = attrs.match(/rx="([^"]+)"/);
+    const swM = attrs.match(/stroke-width="([^"]+)"/);
+    if (rxM && swM) {
+      const inner = parseFloat(rxM[1]) - parseFloat(swM[1]) / 2;
+      if (inner > maxInnerRx) maxInnerRx = inner;
+    }
+  }
+  return Math.round(maxInnerRx);
+}
+
 async function detectOverlayScreen(svgContent) {
   const pngBuffer = await sharp(Buffer.from(svgContent)).png().toBuffer();
   // Scan at 15% from left to avoid center notch/dynamic-island blocking the top boundary
@@ -133,7 +149,7 @@ async function detectOverlayScreen(svgContent) {
 
 // ── File updaters ─────────────────────────────────────────────────────────────
 
-function updateFramesIndex(deviceId, frameType, canvas, screen, colors) {
+function updateFramesIndex(deviceId, frameType, canvas, screen, colors, cornerRadius) {
   const filePath = path.join(ROOT, 'src', 'frames', 'index.ts');
   let content = fs.readFileSync(filePath, 'utf8');
 
@@ -145,10 +161,12 @@ function updateFramesIndex(deviceId, frameType, canvas, screen, colors) {
   const colorLines = colors.map(c => `      '${c}': '${c}.svg',`).join('\n');
   const frameTypeLine = (frameType === 'raster' || frameType === 'overlay')
     ? `\n    frameType: '${frameType}',` : '';
+  const cornerRadiusLine = (frameType === 'overlay' && cornerRadius > 0)
+    ? `\n    cornerRadius: ${cornerRadius},` : '';
 
   const entry = `  '${deviceId}': {
     canvas: { w: ${canvas.w}, h: ${canvas.h} },
-    screen: { x: ${screen.x}, y: ${screen.y}, w: ${screen.w}, h: ${screen.h} },${frameTypeLine}
+    screen: { x: ${screen.x}, y: ${screen.y}, w: ${screen.w}, h: ${screen.h} },${frameTypeLine}${cornerRadiusLine}
     colors: {
 ${colorLines}
     },
@@ -256,7 +274,7 @@ async function main() {
   const isVector = firstSvg.includes('id="Screen mask"');
   const isRaster = firstSvg.includes('data:image/png;base64');
 
-  let frameType, canvas, screen;
+  let frameType, canvas, screen, cornerRadius;
 
   if (isVector) {
     frameType = 'vector';
@@ -282,15 +300,17 @@ async function main() {
     process.stdout.write('\nDetecting screen bounds from rendered SVG... ');
     ({ canvas, screen } = await detectOverlayScreen(firstSvg));
     console.log('done');
+    cornerRadius = detectCornerRadius(firstSvg);
     console.log(`Frame type: overlay`);
     console.log(`Canvas: ${canvas.w} x ${canvas.h}`);
     console.log(`Screen: x=${screen.x} y=${screen.y} w=${screen.w} h=${screen.h}`);
+    console.log(`Corner radius: ${cornerRadius}`);
   }
 
   console.log('\nUpdating files:');
 
   process.stdout.write('  src/frames/index.ts ... ');
-  updateFramesIndex(deviceId, frameType, canvas, screen, colors);
+  updateFramesIndex(deviceId, frameType, canvas, screen, colors, cornerRadius ?? 0);
   console.log('done');
 
   process.stdout.write('  package.json ... ');
