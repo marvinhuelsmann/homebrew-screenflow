@@ -26,6 +26,15 @@ export const FRAMES: Record<string, FrameSpec> = {
       'space-gray-with-apple-pencil': 'space-gray-with-apple-pencil.svg',
     },
   },
+  'ipad-pro-13': {
+    canvas: { w: 3132, h: 2448 },
+    screen: { x: 200, y: 200, w: 2732, h: 2048 },
+    frameType: 'raster',
+    colors: {
+      'silver': 'silver.svg',
+      'space-gray': 'space-gray.svg',
+    },
+  },
 };
 
 export const DEFAULT_DEVICE = 'iphone-17-pro';

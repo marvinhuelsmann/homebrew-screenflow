@@ -66,7 +66,8 @@ screenflow --devices
 | Device | ID | Colors |
 |---|---|---|
 | iPhone 17 Pro | `iphone-17-pro` | `silver`, `deep-blue`, `cosmic-orange` |
-| iPad Pro | `ipad-pro-11` | `silver`, `silver-with-apple-pencil`, `space-gray`, `space-gray-with-apple-pencil` |
+| iPad Pro 11" | `ipad-pro-11` | `silver`, `silver-with-apple-pencil`, `space-gray`, `space-gray-with-apple-pencil` |
+| iPad Pro 13" | `ipad-pro-13` | `silver`, `space-gray` |
 
 ## Updating
 
@@ -90,12 +91,16 @@ src/
       silver.svg
       deep-blue.svg
       cosmic-orange.svg
+    ipad-pro-11/
+    ipad-pro-13/
   commands/
     frame.ts        ← frame a screenshot
     setDefault.ts   ← interactive default picker
     devices.ts      ← list devices and colors
     showConfig.ts   ← print saved defaults
     author.ts       ← author info
+scripts/
+  add-device.js     ← automation: registers a new device across all files
 ```
 
 ---
@@ -129,7 +134,7 @@ node dist/index.js screenshot.png
 
 ### Adding a new device
 
-**1. Export the SVG frames** from your design tool — one file per color variant.
+**1. Export the SVG frames** from your design tool — one file per color variant. Name each file after its color (e.g. `silver.svg`, `space-gray.svg`).
 
 **2. Create the device folder** and drop in the SVGs:
 
@@ -141,57 +146,30 @@ src/frames/
     deep-blue.svg
 ```
 
-**3. Register the device** in `src/frames/index.ts`:
+**3. Run the `add-device` script:**
 
-```ts
-export const FRAMES: Record<string, FrameSpec> = {
-  'iphone-17-pro': { ... },
-
-  'your-new-device': {
-    canvas: { w: 880, h: 1832 },   // SVG canvas size
-    screen: { x: 38, y: 42, w: 804, h: 1748 }, // transparent screen area
-    colors: {
-      'silver':    'silver.svg',
-      'deep-blue': 'deep-blue.svg',
-    },
-  },
-};
+```bash
+npm run add-device your-new-device
+# or with a custom display name:
+npm run add-device your-new-device 'Your New Device'
 ```
 
-> **How to find screen coordinates:** Run the SVG through sharp, scan pixel rows/columns for opaque→transparent transitions. See the existing values in `src/frames/index.ts` as a reference.
+The script automatically:
+- Detects the frame type (vector SVG or raster PNG-in-SVG)
+- Calculates the screen coordinates by scanning for the transparent screen area
+- Registers the device in `src/frames/index.ts`
+- Adds the `cp` command to the `package.json` build script
+- Adds the device and its colors to both completion files
+- Adds a row to the device table in `README.md`
 
-**4. Update the build script** in `package.json`:
-
-```json
-"build": "tsc && cp -r src/frames/iphone-17-pro dist/frames/ && cp -r src/frames/your-new-device dist/frames/"
-```
-
-**5. Add completions** for the new device in both completion files:
-
-`completions/_screenflow` — add a `case` block:
-```zsh
-your-new-device)
-  colors=('silver:Silver' 'deep-blue:Deep Blue')
-  ;;
-```
-and add the device to the `devices` array:
-```zsh
-devices=('iphone-17-pro:iPhone 17 Pro (default)' 'your-new-device:Your New Device')
-```
-
-`completions/screenflow.fish` — add the device to the `-l device` completion and a new `-l color` block scoped to your device:
-```fish
-complete -c screenflow -l color -r -d 'Frame color' \
-  -n '__fish_seen_argument --device your-new-device' \
-  -a 'silver\t"Silver" deep-blue\t"Deep Blue"'
-```
-
-**6. Build and test:**
+**4. Build and test:**
 
 ```bash
 npm run build
 node dist/index.js screenshot.png --device your-new-device --color silver
 ```
+
+> **Vector frames** (like the iPhone SVGs) have a `<path id="Screen mask">` element. The script registers them but cannot auto-detect screen coordinates from vector paths — check the logged output and correct the values in `src/frames/index.ts` manually if needed.
 
 ---
 
