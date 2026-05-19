@@ -61,12 +61,12 @@ function parseSvgCanvas(svgContent) {
   throw new Error('Could not parse canvas size from SVG');
 }
 
-async function detectScreenFromBuffer(pngBuffer) {
+async function detectScreenFromBuffer(pngBuffer, xFraction = 0.5) {
   const { data, info } = await sharp(pngBuffer).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const { width, height, channels } = info;
 
-  // Scan center column for y transitions, find largest transparent span = screen
-  const cx = Math.floor(width / 2);
+  // Scan at xFraction column for y transitions, find largest transparent span = screen
+  const cx = Math.floor(width * xFraction);
   const ySegs = [];
   let segStart = 0;
   let segOpaque = data[cx * channels + 3] > 10;
@@ -127,7 +127,8 @@ async function detectRasterScreen(svgContent) {
 
 async function detectOverlayScreen(svgContent) {
   const pngBuffer = await sharp(Buffer.from(svgContent)).png().toBuffer();
-  return detectScreenFromBuffer(pngBuffer);
+  // Scan at 15% from left to avoid center notch/dynamic-island blocking the top boundary
+  return detectScreenFromBuffer(pngBuffer, 0.15);
 }
 
 // ── File updaters ─────────────────────────────────────────────────────────────
