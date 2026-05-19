@@ -7,7 +7,7 @@ complete -c screenflow      -l jpeg      -d 'Output as JPEG instead of SVG'
 
 # Devices
 complete -c screenflow -l device -r -d 'Device frame' \
-  -a 'iphone-17-pro\t"iPhone 17 Pro (default)" ipad-pro-11\t"iPad Pro" ipad-pro-13\t"iPad Pro 13"" iphone-13-pro\t"iPhone 13 Pro" iphone-15-pro\t"iPhone 15 Pro"'
+  -a 'iphone-17-pro\t"iPhone 17 Pro (default)" ipad-pro-11\t"iPad Pro" ipad-pro-13\t"iPad Pro 13"" iphone-13-pro\t"iPhone 13 Pro" iphone-15-pro\t"iPhone 15 Pro" iphone-14-pro\t"iPhone 14 Pro" iphone-16-pro\t"iPhone 16 Pro"'
 
 # Colors — scoped per device (add a new block for each new device)
 complete -c screenflow -l color -r -d 'Frame color' \
@@ -29,3 +29,11 @@ complete -c screenflow -l color -r -d 'Frame color' \
 complete -c screenflow -l color -r -d 'Frame color' \
   -n '__fish_seen_argument --device iphone-15-pro' \
   -a 'titanium-nature\t"Dessert Titanium"'
+
+complete -c screenflow -l color -r -d 'Frame color' \
+  -n '__fish_seen_argument --device iphone-14-pro' \
+  -a 'deep-purple\t"Deep Purple"'
+
+complete -c screenflow -l color -r -d 'Frame color' \
+  -n '__fish_seen_argument --device iphone-16-pro' \
+  -a 'dessert-titanium\t"Dessert Titanium"'

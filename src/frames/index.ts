@@ -54,6 +54,24 @@ export const FRAMES: Record<string, FrameSpec> = {
       'titanium-nature': 'titanium-nature.svg',
     },
   },
+  'iphone-14-pro': {
+    canvas: { w: 427, h: 886 },
+    screen: { x: 17, y: 18, w: 393, h: 850 },
+    frameType: 'overlay',
+    cornerRadius: 67,
+    colors: {
+      'deep-purple': 'deep-purple.svg',
+    },
+  },
+  'iphone-16-pro': {
+    canvas: { w: 417, h: 876 },
+    screen: { x: 12, y: 13, w: 393, h: 850 },
+    frameType: 'overlay',
+    cornerRadius: 65,
+    colors: {
+      'dessert-titanium': 'dessert-titanium.svg',
+    },
+  },
 };
 
 export const DEFAULT_DEVICE = 'iphone-17-pro';
