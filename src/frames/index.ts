@@ -43,6 +43,14 @@ export const FRAMES: Record<string, FrameSpec> = {
       'sierra-blue': 'sierra-blue.svg',
     },
   },
+  'iphone-15-pro': {
+    canvas: { w: 423, h: 882 },
+    screen: { x: 15, y: 63, w: 393, h: 804 },
+    frameType: 'overlay',
+    colors: {
+      'dessert-titanium': 'dessert-titanium.svg',
+    },
+  },
 };
 
 export const DEFAULT_DEVICE = 'iphone-17-pro';
