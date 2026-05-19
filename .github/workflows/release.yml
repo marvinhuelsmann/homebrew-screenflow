@@ -2,8 +2,8 @@ name: Release
 
 on:
   push:
-    tags:
-      - "v*"
+    branches:
+      - master
 
 jobs:
   release:
@@ -13,36 +13,61 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: master
 
-      - name: Create GitHub release
+      - name: Read version from package.json
+        id: version
+        run: echo "value=v$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Check if tag already exists
+        id: tag_check
+        run: |
+          TAG="${{ steps.version.outputs.value }}"
+          if git ls-remote --tags origin | grep -q "refs/tags/${TAG}$"; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create tag
+        if: steps.tag_check.outputs.exists == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${{ github.ref_name }}" \
-            --title "${{ github.ref_name }}" \
+          TAG="${{ steps.version.outputs.value }}"
+          git tag "$TAG"
+          git push origin "$TAG"
+
+      - name: Create GitHub release
+        if: steps.tag_check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.version.outputs.value }}" \
+            --title "${{ steps.version.outputs.value }}" \
             --generate-notes \
-            --repo "${{ github.repository }}" || true
+            --repo "${{ github.repository }}"
 
       - name: Compute formula SHA256
+        if: steps.tag_check.outputs.exists == 'false'
         id: sha
         run: |
-          TAG="${{ github.ref_name }}"
+          TAG="${{ steps.version.outputs.value }}"
           URL="https://github.com/${{ github.repository }}/archive/refs/tags/${TAG}.tar.gz"
           SHA=$(curl -sL "$URL" | shasum -a 256 | awk '{print $1}')
           echo "sha256=$SHA" >> "$GITHUB_OUTPUT"
           echo "url=$URL" >> "$GITHUB_OUTPUT"
 
       - name: Update formula
+        if: steps.tag_check.outputs.exists == 'false'
         run: |
           sed -i "s|url \".*\"|url \"${{ steps.sha.outputs.url }}\"|" Formula/screenflow.rb
           sed -i "s|sha256 \".*\"|sha256 \"${{ steps.sha.outputs.sha256 }}\"|" Formula/screenflow.rb
 
       - name: Commit and push formula
+        if: steps.tag_check.outputs.exists == 'false'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Formula/screenflow.rb
-          git commit -m "chore: update formula to ${{ github.ref_name }}"
+          git commit -m "chore: update formula to ${{ steps.version.outputs.value }}"
           git push origin HEAD:master
