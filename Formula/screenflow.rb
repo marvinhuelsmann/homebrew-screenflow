@@ -15,8 +15,8 @@ class Screenflow < Formula
       #!/bin/sh
       exec node "#{libexec}/dist/index.js" "$@"
     SH
-    zsh_completion.install "completions/_screenflow"
-    fish_completion.install "completions/screenflow.fish"
+    zsh_completion.install libexec/"completions/_screenflow"
+    fish_completion.install libexec/"completions/screenflow.fish"
   end
 
   test do
