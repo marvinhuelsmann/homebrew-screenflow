@@ -1,0 +1,19 @@
+export interface FrameSpec {
+  canvas: { w: number; h: number };
+  screen: { x: number; y: number; w: number; h: number };
+  colors: Record<string, string>; // color name → svg filename within device folder
+}
+
+export const FRAMES: Record<string, FrameSpec> = {
+  'iphone-17-pro': {
+    canvas: { w: 880, h: 1832 },
+    screen: { x: 38, y: 42, w: 804, h: 1748 },
+    colors: {
+      'silver': 'silver.svg',
+      'deep-blue': 'deep-blue.svg',
+      'cosmic-orange': 'cosmic-orange.svg',
+    },
+  },
+};
+
+export const DEFAULT_DEVICE = 'iphone-17-pro';

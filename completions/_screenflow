@@ -1,12 +1,32 @@
 #compdef screenflow
 
 _screenflow() {
+  local device='iphone-17-pro'
+
+  # Detect which --device value has been typed so far
+  for ((i = 2; i < ${#words[@]}; i++)); do
+    if [[ ${words[$i]} == --device=* ]]; then
+      device=${words[$i]#--device=}
+      break
+    elif [[ ${words[$i]} == '--device' && -n ${words[$((i+1))]} ]]; then
+      device=${words[$((i+1))]}
+      break
+    fi
+  done
+
+  # Colors per device — add a new case block when a new device is added
   local -a colors
-  colors=(
-    'silver:Silver frame (default)'
-    'deep-blue:Deep Blue frame'
-    'cosmic-orange:Cosmic Orange frame'
-  )
+  case $device in
+    iphone-17-pro)
+      colors=('silver:Silver (default)' 'deep-blue:Deep Blue' 'cosmic-orange:Cosmic Orange')
+      ;;
+    *)
+      colors=('silver:Silver (default)' 'deep-blue:Deep Blue' 'cosmic-orange:Cosmic Orange')
+      ;;
+  esac
+
+  local -a devices
+  devices=('iphone-17-pro:iPhone 17 Pro (default)')
 
   _arguments \
     '(-v --version)'{-v,--version}'[output the version number]' \
@@ -15,8 +35,14 @@ _screenflow() {
     '(-o --output)'{-o+,--output=}'[output file path]:output file:_files' \
     '--png[output as PNG instead of SVG]' \
     '--jpeg[output as JPEG instead of SVG]' \
-    '--color=[frame color]:color:(silver deep-blue cosmic-orange)' \
+    '--device=[device frame]:device:->devices' \
+    '--color=[frame color]:color:->colors' \
     ':screenshot:_files -g "*.png *.jpg *.jpeg"'
+
+  case $state in
+    devices) _describe 'device' devices ;;
+    colors)  _describe 'color'  colors  ;;
+  esac
 }
 
 _screenflow "$@"

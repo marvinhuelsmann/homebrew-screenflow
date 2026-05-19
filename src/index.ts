@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import path from 'path';
-import { compose, COLORS } from './composer';
+import { compose, COLORS, DEVICES } from './composer';
+import { DEFAULT_DEVICE } from './frames/index';
 import { version } from '../package.json';
 
 const program = new Command();
@@ -17,16 +18,19 @@ program
   .option('--png', 'Output as PNG instead of SVG')
   .option('--jpeg', 'Output as JPEG instead of SVG')
   .option('--color <color>', `Frame color: ${COLORS.join(', ')}`, 'silver')
+  .option('--device <device>', `Device frame: ${DEVICES.join(', ')}`, DEFAULT_DEVICE)
   .option('--author', 'About the author')
-  .action(async (file: string, options: { output?: string; png?: boolean; jpeg?: boolean; color: string; author?: boolean }) => {
+  .action(async (file: string, options: { output?: string; png?: boolean; jpeg?: boolean; color: string; device: string; author?: boolean }) => {
     if (options.author) {
       console.log('');
       console.log('  Screenflow is made by Marvin Hülsmann');
-      console.log('  Website  →  https://marvhuelsmann.de');
+      console.log('  Website  →  https://marvhuelsmann.com');
       console.log('  X        →  https://x.com/marvhuelsmann');
       console.log('');
+      console.log('  in berlin, germany');
       process.exit(0);
     }
+
     const inputPath = path.resolve(file);
     const base = path.basename(inputPath, path.extname(inputPath));
     const dir = path.dirname(inputPath);
@@ -38,11 +42,11 @@ program
 
     const outputPath = options.output
       ? path.resolve(options.output)
-      : path.join(dir, `${base}_iphone17${outExt}`);
+      : path.join(dir, `${base}_${options.device}${outExt}`);
 
     try {
       process.stdout.write(`Framing ${path.basename(inputPath)} → ${path.basename(outputPath)} ... `);
-      await compose(inputPath, 'iphone17', outputPath, format, options.color);
+      await compose(inputPath, options.device, outputPath, format, options.color);
       console.log('done');
     } catch (err) {
       console.error('');

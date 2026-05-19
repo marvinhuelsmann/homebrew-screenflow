@@ -1,26 +1,24 @@
 import sharp from 'sharp';
 import * as fs from 'fs';
 import * as path from 'path';
+import { FRAMES, DEFAULT_DEVICE } from './frames';
 
-export type Color = 'silver' | 'deep-blue' | 'cosmic-orange';
 export type Format = 'svg' | 'png' | 'jpeg';
 
-const CANVAS = { w: 880, h: 1832 };
-// Transparent screen area measured from rendered frame (pixel transitions)
-const SCREEN = { x: 38, y: 42, w: 804, h: 1748 };
+export const DEVICES = Object.keys(FRAMES);
+export const COLORS = Object.keys(FRAMES[DEFAULT_DEVICE].colors);
 
-const COLOR_FILES: Record<Color, string> = {
-  'silver': 'iPhone_17_Pro_Silver.svg',
-  'deep-blue': 'iPhone_17_Pro_Deep_Blue.svg',
-  'cosmic-orange': 'iPhone_17_Pro_CosmicOrange.svg',
-};
+function resolveDevice(input: string): string {
+  const id = input.toLowerCase().trim();
+  if (id in FRAMES) return id;
+  throw new Error(`Unknown device "${input}". Available: ${DEVICES.join(', ')}`);
+}
 
-export const COLORS = Object.keys(COLOR_FILES) as Color[];
-
-function resolveColor(input: string): Color {
-  const normalized = input.toLowerCase().trim();
-  if (normalized in COLOR_FILES) return normalized as Color;
-  throw new Error(`Unknown color "${input}". Available: ${COLORS.join(', ')}`);
+function resolveColor(device: string, input: string): string {
+  const id = input.toLowerCase().trim();
+  const colors = FRAMES[device].colors;
+  if (id in colors) return id;
+  throw new Error(`Unknown color "${input}" for ${device}. Available: ${Object.keys(colors).join(', ')}`);
 }
 
 function extractPhoneBodyPath(svgContent: string): string {
@@ -32,7 +30,11 @@ function extractPhoneBodyPath(svgContent: string): string {
   return parts[1].trim() + 'Z';
 }
 
-function buildCompositeSvg(frameSvg: string, screenshotB64: string): string {
+function buildCompositeSvg(
+  frameSvg: string,
+  screenshotB64: string,
+  screen: { x: number; y: number; w: number; h: number },
+): string {
   const phoneBodyPath = extractPhoneBodyPath(frameSvg);
 
   const defs = [
@@ -43,9 +45,8 @@ function buildCompositeSvg(frameSvg: string, screenshotB64: string): string {
     `</defs>`,
   ].join('');
 
-  const image = `<image clip-path="url(#sf-screen-clip)" x="${SCREEN.x}" y="${SCREEN.y}" width="${SCREEN.w}" height="${SCREEN.h}" href="data:image/png;base64,${screenshotB64}"/>`;
+  const image = `<image clip-path="url(#sf-screen-clip)" x="${screen.x}" y="${screen.y}" width="${screen.w}" height="${screen.h}" href="data:image/png;base64,${screenshotB64}"/>`;
 
-  // Add xlink namespace for broad SVG viewer compatibility and inject screenshot behind phone chrome
   return frameSvg
     .replace('<svg ', '<svg xmlns:xlink="http://www.w3.org/1999/xlink" ')
     .replace('<g id="Phone">', `<g id="Phone">${defs}${image}`);
@@ -53,21 +54,24 @@ function buildCompositeSvg(frameSvg: string, screenshotB64: string): string {
 
 export async function compose(
   inputPath: string,
-  _deviceId: string,
+  deviceInput: string,
   outputPath: string,
   format: Format = 'svg',
   colorInput = 'silver',
 ): Promise<void> {
-  const color = resolveColor(colorInput);
-  const framePath = path.join(__dirname, 'frames', COLOR_FILES[color]);
+  const device = resolveDevice(deviceInput);
+  const color = resolveColor(device, colorInput);
+  const spec = FRAMES[device];
+
+  const framePath = path.join(__dirname, 'frames', device, spec.colors[color]);
   const frameSvg = fs.readFileSync(framePath, 'utf8');
 
   const screenshot = await sharp(inputPath)
-    .resize(SCREEN.w, SCREEN.h, { fit: 'cover', position: 'top' })
+    .resize(spec.screen.w, spec.screen.h, { fit: 'cover', position: 'top' })
     .png()
     .toBuffer();
 
-  const compositeSvg = buildCompositeSvg(frameSvg, screenshot.toString('base64'));
+  const compositeSvg = buildCompositeSvg(frameSvg, screenshot.toString('base64'), spec.screen);
 
   if (format === 'svg') {
     fs.writeFileSync(outputPath, compositeSvg, 'utf8');
