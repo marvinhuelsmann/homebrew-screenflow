@@ -19,7 +19,8 @@
     "build": "tsc && cp -r src/frames/iphone-17-pro dist/frames/ && cp -r src/frames/ipad-pro-11 dist/frames/ && cp -r src/frames/ipad-pro-13 dist/frames/",
     "prepare": "npm run build",
     "dev": "ts-node src/index.ts",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "add-device": "node scripts/add-device.js"
   },
   "dependencies": {
     "@inquirer/prompts": "^8.4.3",
