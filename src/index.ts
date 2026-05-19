@@ -8,16 +8,24 @@ const program = new Command();
 program
   .name('screenflow')
   .description('Wrap simulator screenshots in a device frame — pixel-perfect, no clock, no Dynamic Island')
-  .version('0.1.0');
+  .version('0.1.0', '-v, --version');
 
 program
   .argument('<file>', 'Screenshot image file (PNG, JPG)')
-  .argument('[device]', 'Device frame to use (default: iphone17)')
   .option('-o, --output <path>', 'Output file path')
   .option('--png', 'Output as PNG instead of SVG')
   .option('--jpeg', 'Output as JPEG instead of SVG')
-  .option('--color <color>', `Frame color: ${COLORS.join(', ')} (default: silver)`, 'silver')
-  .action(async (file: string, device = 'iphone17', options: { output?: string; png?: boolean; jpeg?: boolean; color: string }) => {
+  .option('--color <color>', `Frame color: ${COLORS.join(', ')}`, 'silver')
+  .option('--author', 'About the author')
+  .action(async (file: string, options: { output?: string; png?: boolean; jpeg?: boolean; color: string; author?: boolean }) => {
+    if (options.author) {
+      console.log('');
+      console.log('  Screenflow is made by Marvin Hülsmann');
+      console.log('  Website  →  https://marvhuelsmann.de');
+      console.log('  X        →  https://x.com/marvhuelsmann');
+      console.log('');
+      process.exit(0);
+    }
     const inputPath = path.resolve(file);
     const base = path.basename(inputPath, path.extname(inputPath));
     const dir = path.dirname(inputPath);
@@ -29,11 +37,11 @@ program
 
     const outputPath = options.output
       ? path.resolve(options.output)
-      : path.join(dir, `${base}_${device}${outExt}`);
+      : path.join(dir, `${base}_iphone17${outExt}`);
 
     try {
       process.stdout.write(`Framing ${path.basename(inputPath)} → ${path.basename(outputPath)} ... `);
-      await compose(inputPath, device, outputPath, format, options.color);
+      await compose(inputPath, 'iphone17', outputPath, format, options.color);
       console.log('done');
     } catch (err) {
       console.error('');
@@ -42,4 +50,14 @@ program
     }
   });
 
+if (process.argv.length <= 2) program.help();
+if (process.argv.includes('--author')) {
+  console.log('');
+  console.log('  Screenflow is made by Marvin Hülsmann');
+  console.log('  Website  →  https://marvhuelsmann.com');
+  console.log('  X        →  https://x.com/marvhuelsmann');
+  console.log('');
+  console.log('  in berlin, germany');
+  process.exit(0);
+}
 program.parse();

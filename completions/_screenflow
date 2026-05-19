@@ -1,0 +1,22 @@
+#compdef screenflow
+
+_screenflow() {
+  local -a colors
+  colors=(
+    'silver:Silver frame (default)'
+    'deep-blue:Deep Blue frame'
+    'cosmic-orange:Cosmic Orange frame'
+  )
+
+  _arguments \
+    '(-v --version)'{-v,--version}'[output the version number]' \
+    '(-h --help)'{-h,--help}'[display help]' \
+    '--author[about the author]' \
+    '(-o --output)'{-o+,--output=}'[output file path]:output file:_files' \
+    '--png[output as PNG instead of SVG]' \
+    '--jpeg[output as JPEG instead of SVG]' \
+    '--color=[frame color]:color:(silver deep-blue cosmic-orange)' \
+    ':screenshot:_files -g "*.png *.jpg *.jpeg"'
+}
+
+_screenflow "$@"
