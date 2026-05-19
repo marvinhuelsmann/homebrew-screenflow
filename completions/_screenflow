@@ -30,7 +30,7 @@ _screenflow() {
       colors=('sierra-blue:Sierra Blue')
       ;;
     iphone-15-pro)
-      colors=('dessert-titanium:Dessert Titanium')
+      colors=('titanium-nature:Dessert Titanium')
       ;;
     *)
       colors=('silver:Silver (default)')

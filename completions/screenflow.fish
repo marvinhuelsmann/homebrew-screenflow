@@ -28,4 +28,4 @@ complete -c screenflow -l color -r -d 'Frame color' \
 
 complete -c screenflow -l color -r -d 'Frame color' \
   -n '__fish_seen_argument --device iphone-15-pro' \
-  -a 'dessert-titanium\t"Dessert Titanium"'
+  -a 'titanium-nature\t"Dessert Titanium"'

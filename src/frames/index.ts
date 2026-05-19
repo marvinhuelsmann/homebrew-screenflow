@@ -51,7 +51,7 @@ export const FRAMES: Record<string, FrameSpec> = {
     frameType: 'overlay',
     cornerRadius: 58,
     colors: {
-      'dessert-titanium': 'dessert-titanium.svg',
+      'titanium-nature': 'titanium-nature.svg',
     },
   },
 };
