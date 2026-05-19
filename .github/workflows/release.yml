@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: main
+          ref: master
 
       - name: Create GitHub release
         env:
@@ -41,4 +41,4 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Formula/screenflow.rb
           git commit -m "chore: update formula to ${{ github.ref_name }}"
-          git push origin HEAD:main
+          git push origin HEAD:master

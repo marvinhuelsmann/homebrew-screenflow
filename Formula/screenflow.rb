@@ -4,7 +4,7 @@ class Screenflow < Formula
   url "https://github.com/marvinhuelsmann/screenflow/archive/refs/tags/v0.1.0.tar.gz"
   sha256 "PLACEHOLDER" # updated automatically by release workflow
   license "MIT"
-  head "https://github.com/marvinhuelsmann/screenflow.git", branch: "main"
+  head "https://github.com/marvinhuelsmann/screenflow.git", branch: "master"
 
   depends_on "node"
 
