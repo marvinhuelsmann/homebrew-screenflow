@@ -10,13 +10,13 @@ class Screenflow < Formula
 
   def install
     system "npm", "ci"
+    zsh_completion.install "completions/_screenflow"
+    fish_completion.install "completions/screenflow.fish"
     libexec.install Dir["*"]
     (bin/"screenflow").write <<~SH
       #!/bin/sh
       exec node "#{libexec}/dist/index.js" "$@"
     SH
-    zsh_completion.install libexec/"completions/_screenflow"
-    fish_completion.install libexec/"completions/screenflow.fish"
   end
 
   test do
