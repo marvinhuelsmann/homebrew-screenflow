@@ -2,13 +2,14 @@
 import { Command } from 'commander';
 import path from 'path';
 import { compose, COLORS } from './composer';
+import { version } from '../package.json';
 
 const program = new Command();
 
 program
   .name('screenflow')
   .description('Wrap simulator screenshots in a device frame — pixel-perfect, no clock, no Dynamic Island')
-  .version('0.1.0', '-v, --version');
+  .version(version, '-v, --version');
 
 program
   .argument('<file>', 'Screenshot image file (PNG, JPG)')
