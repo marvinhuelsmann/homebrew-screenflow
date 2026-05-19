@@ -126,19 +126,22 @@ async function detectRasterScreen(svgContent) {
 }
 
 function detectCornerRadius(svgContent) {
-  // Find all closed rects with both rx and stroke-width, pick the one with the largest rx
+  // Pick the rect with the largest stroke-width (= main device frame, not decorative outline)
   // Inner radius = rx - stroke-width/2
-  let maxInnerRx = 0;
+  let bestSw = 0, bestInner = 0;
   for (const m of svgContent.matchAll(/<rect([^>]+)\/>/g)) {
     const attrs = m[1];
     const rxM = attrs.match(/rx="([^"]+)"/);
     const swM = attrs.match(/stroke-width="([^"]+)"/);
     if (rxM && swM) {
-      const inner = parseFloat(rxM[1]) - parseFloat(swM[1]) / 2;
-      if (inner > maxInnerRx) maxInnerRx = inner;
+      const sw = parseFloat(swM[1]);
+      if (sw > bestSw) {
+        bestSw = sw;
+        bestInner = parseFloat(rxM[1]) - sw / 2;
+      }
     }
   }
-  return Math.round(maxInnerRx);
+  return Math.round(bestInner);
 }
 
 async function detectOverlayScreen(svgContent) {

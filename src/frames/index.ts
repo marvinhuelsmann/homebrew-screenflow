@@ -58,7 +58,7 @@ export const FRAMES: Record<string, FrameSpec> = {
     canvas: { w: 427, h: 886 },
     screen: { x: 17, y: 18, w: 393, h: 850 },
     frameType: 'overlay',
-    cornerRadius: 67,
+    cornerRadius: 56,
     colors: {
       'deep-purple': 'deep-purple.svg',
     },
@@ -67,7 +67,7 @@ export const FRAMES: Record<string, FrameSpec> = {
     canvas: { w: 417, h: 876 },
     screen: { x: 12, y: 13, w: 393, h: 850 },
     frameType: 'overlay',
-    cornerRadius: 65,
+    cornerRadius: 58,
     colors: {
       'dessert-titanium': 'dessert-titanium.svg',
     },
