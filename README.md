@@ -18,7 +18,7 @@ Output defaults to SVG and is placed next to your input file.
 
 ```bash
 screenflow screenshot.png
-# → screenshot_iphone-17-pro.svg
+# → screenshot_iphone-17-pro_silver.svg
 ```
 
 ### Options
@@ -30,6 +30,9 @@ screenflow screenshot.png
 | `--png` | Output as PNG instead of SVG |
 | `--jpeg` | Output as JPEG instead of SVG |
 | `-o <path>` | Custom output file path |
+| `--devices` | List all devices and their available colors |
+| `--set-default` | Save a default device and color interactively |
+| `--show-config` | Show your saved defaults |
 | `-v` | Show version |
 | `--author` | About the author |
 
@@ -38,9 +41,6 @@ screenflow screenshot.png
 ```bash
 # Default — iPhone 17 Pro, Silver frame, SVG output
 screenflow screenshot.png
-
-# Different device
-screenflow screenshot.png --device iphone-17-pro
 
 # Deep Blue frame
 screenflow screenshot.png --color deep-blue
@@ -53,6 +53,12 @@ screenflow screenshot.png -o framed/app_store.svg
 
 # JPEG for smaller file size
 screenflow screenshot.png --jpeg
+
+# Set a persistent default device and color
+screenflow --set-default
+
+# List all available devices and colors
+screenflow --devices
 ```
 
 ### Supported Devices
@@ -65,6 +71,30 @@ screenflow screenshot.png --jpeg
 
 ```bash
 brew upgrade screenflow
+```
+
+---
+
+## Project Structure
+
+```
+src/
+  index.ts          ← entry point (3 lines)
+  cli.ts            ← program setup + command routing
+  composer.ts       ← SVG compositing and output rendering
+  config.ts         ← Config class (reads/writes ~/.config/screenflow/config.json)
+  frames/
+    index.ts        ← FRAMES registry — source of truth for devices, colors, dimensions
+    iphone-17-pro/  ← SVG frame files per color
+      silver.svg
+      deep-blue.svg
+      cosmic-orange.svg
+  commands/
+    frame.ts        ← frame a screenshot
+    setDefault.ts   ← interactive default picker
+    devices.ts      ← list devices and colors
+    showConfig.ts   ← print saved defaults
+    author.ts       ← author info
 ```
 
 ---
@@ -120,8 +150,8 @@ export const FRAMES: Record<string, FrameSpec> = {
     canvas: { w: 880, h: 1832 },   // SVG canvas size
     screen: { x: 38, y: 42, w: 804, h: 1748 }, // transparent screen area
     colors: {
-      'silver':         'silver.svg',
-      'deep-blue':      'deep-blue.svg',
+      'silver':    'silver.svg',
+      'deep-blue': 'deep-blue.svg',
     },
   },
 };
@@ -148,7 +178,7 @@ and add the device to the `devices` array:
 devices=('iphone-17-pro:iPhone 17 Pro (default)' 'your-new-device:Your New Device')
 ```
 
-`completions/screenflow.fish` — add device to the `-l device` completion and a new `-l color` block scoped to your device:
+`completions/screenflow.fish` — add the device to the `-l device` completion and a new `-l color` block scoped to your device:
 ```fish
 complete -c screenflow -l color -r -d 'Frame color' \
   -n '__fish_seen_argument --device your-new-device' \
@@ -196,4 +226,4 @@ node dist/index.js screenshot.png --device your-new-device --color silver
 
 ## License
 
-MIT © [Marvin Hülsmann](https://marvhuelsmann.de)
+MIT © [Marvin Hülsmann](https://marvhuelsmann.com)

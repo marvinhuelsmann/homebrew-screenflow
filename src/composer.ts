@@ -6,7 +6,6 @@ import { FRAMES, DEFAULT_DEVICE } from './frames';
 export type Format = 'svg' | 'png' | 'jpeg';
 
 export const DEVICES = Object.keys(FRAMES);
-export const COLORS = Object.keys(FRAMES[DEFAULT_DEVICE].colors);
 
 function resolveDevice(input: string): string {
   const id = input.toLowerCase().trim();
