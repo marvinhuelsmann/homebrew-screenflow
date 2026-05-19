@@ -115,6 +115,48 @@ async function composeRaster(
   else await composed.png({ compressionLevel: 6 }).toFile(outputPath);
 }
 
+// ── Overlay compositing (transparent SVG outline drawn on top) ───────────────
+
+async function composeOverlay(
+  inputPath: string, spec: FrameSpec, frameSvg: string,
+  outputPath: string, format: Format,
+): Promise<void> {
+  const screenshot = await sharp(inputPath)
+    .resize(spec.screen.w, spec.screen.h, { fit: 'cover', position: 'top' })
+    .png()
+    .toBuffer();
+
+  if (format === 'svg') {
+    const screenshotB64 = screenshot.toString('base64');
+    const frameB64Svg = Buffer.from(frameSvg).toString('base64');
+    const svgOut = [
+      `<svg width="${spec.canvas.w}" height="${spec.canvas.h}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">`,
+      `<image x="${spec.screen.x}" y="${spec.screen.y}" width="${spec.screen.w}" height="${spec.screen.h}" href="data:image/png;base64,${screenshotB64}"/>`,
+      `<image x="0" y="0" width="${spec.canvas.w}" height="${spec.canvas.h}" href="data:image/svg+xml;base64,${frameB64Svg}"/>`,
+      `</svg>`,
+    ].join('\n');
+    fs.writeFileSync(outputPath, svgOut, 'utf8');
+    return;
+  }
+
+  const frameBuffer = await sharp(Buffer.from(frameSvg)).png().toBuffer();
+
+  const composed = sharp({
+    create: {
+      width: spec.canvas.w,
+      height: spec.canvas.h,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  }).composite([
+    { input: screenshot, left: spec.screen.x, top: spec.screen.y },
+    { input: frameBuffer, left: 0, top: 0 },
+  ]);
+
+  if (format === 'jpeg') await composed.jpeg({ quality: 90 }).toFile(outputPath);
+  else await composed.png({ compressionLevel: 6 }).toFile(outputPath);
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export async function compose(
@@ -133,6 +175,8 @@ export async function compose(
 
   if (spec.frameType === 'raster') {
     await composeRaster(inputPath, spec, frameSvg, outputPath, format);
+  } else if (spec.frameType === 'overlay') {
+    await composeOverlay(inputPath, spec, frameSvg, outputPath, format);
   } else {
     await composeVector(inputPath, spec, frameSvg, outputPath, format);
   }

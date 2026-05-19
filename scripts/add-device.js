@@ -61,11 +61,7 @@ function parseSvgCanvas(svgContent) {
   throw new Error('Could not parse canvas size from SVG');
 }
 
-async function detectRasterScreen(svgContent) {
-  const match = svgContent.match(/xlink:href="data:image\/png;base64,([^"]+)"/);
-  if (!match) throw new Error('No embedded PNG found in raster frame SVG');
-
-  const pngBuffer = Buffer.from(match[1], 'base64');
+async function detectScreenFromBuffer(pngBuffer) {
   const { data, info } = await sharp(pngBuffer).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const { width, height, channels } = info;
 
@@ -123,6 +119,17 @@ async function detectRasterScreen(svgContent) {
   };
 }
 
+async function detectRasterScreen(svgContent) {
+  const match = svgContent.match(/xlink:href="data:image\/png;base64,([^"]+)"/);
+  if (!match) throw new Error('No embedded PNG found in raster frame SVG');
+  return detectScreenFromBuffer(Buffer.from(match[1], 'base64'));
+}
+
+async function detectOverlayScreen(svgContent) {
+  const pngBuffer = await sharp(Buffer.from(svgContent)).png().toBuffer();
+  return detectScreenFromBuffer(pngBuffer);
+}
+
 // ── File updaters ─────────────────────────────────────────────────────────────
 
 function updateFramesIndex(deviceId, frameType, canvas, screen, colors) {
@@ -135,7 +142,8 @@ function updateFramesIndex(deviceId, frameType, canvas, screen, colors) {
   }
 
   const colorLines = colors.map(c => `      '${c}': '${c}.svg',`).join('\n');
-  const frameTypeLine = frameType === 'raster' ? "\n    frameType: 'raster'," : '';
+  const frameTypeLine = (frameType === 'raster' || frameType === 'overlay')
+    ? `\n    frameType: '${frameType}',` : '';
 
   const entry = `  '${deviceId}': {
     canvas: { w: ${canvas.w}, h: ${canvas.h} },
@@ -267,8 +275,15 @@ async function main() {
     console.log(`Canvas: ${canvas.w} x ${canvas.h}`);
     console.log(`Screen: x=${screen.x} y=${screen.y} w=${screen.w} h=${screen.h}`);
   } else {
-    console.error('Unknown SVG format — no "Screen mask" path or embedded PNG found.');
-    process.exit(1);
+    // Transparent SVG overlay (strokes/outlines on transparent background)
+    frameType = 'overlay';
+    canvas = parseSvgCanvas(firstSvg);
+    process.stdout.write('\nDetecting screen bounds from rendered SVG... ');
+    ({ canvas, screen } = await detectOverlayScreen(firstSvg));
+    console.log('done');
+    console.log(`Frame type: overlay`);
+    console.log(`Canvas: ${canvas.w} x ${canvas.h}`);
+    console.log(`Screen: x=${screen.x} y=${screen.y} w=${screen.w} h=${screen.h}`);
   }
 
   console.log('\nUpdating files:');

@@ -2,7 +2,7 @@ export interface FrameSpec {
   canvas: { w: number; h: number };
   screen: { x: number; y: number; w: number; h: number };
   colors: Record<string, string>; // color name → svg filename within device folder
-  frameType?: 'vector' | 'raster'; // default: 'vector'
+  frameType?: 'vector' | 'raster' | 'overlay'; // default: 'vector'
 }
 
 export const FRAMES: Record<string, FrameSpec> = {
@@ -33,6 +33,14 @@ export const FRAMES: Record<string, FrameSpec> = {
     colors: {
       'silver': 'silver.svg',
       'space-gray': 'space-gray.svg',
+    },
+  },
+  'iphone-13-pro': {
+    canvas: { w: 430, h: 884 },
+    screen: { x: 20, y: 55, w: 390, h: 809 },
+    frameType: 'overlay',
+    colors: {
+      'sierra-blue': 'sierra-blue.svg',
     },
   },
 };
