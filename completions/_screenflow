@@ -29,14 +29,20 @@ _screenflow() {
     iphone-13-pro)
       colors=('sierra-blue:Sierra Blue')
       ;;
-    iphone-15-pro)
-      colors=('titanium-nature:Dessert Titanium')
-      ;;
     iphone-14-pro)
       colors=('deep-purple:Deep Purple')
       ;;
+    iphone-15-pro)
+      colors=('titanium-nature:Desert Titanium')
+      ;;
     iphone-16-pro)
-      colors=('dessert-titanium:Dessert Titanium')
+      colors=('dessert-titanium:Desert Titanium' 'black:Black' 'natural:Natural' 'white:White')
+      ;;
+    iphone-air)
+      colors=('black:Black' 'blue:Blue' 'gold:Gold' 'white:White')
+      ;;
+    iphone-17)
+      colors=('black:Black' 'lavender:Lavender' 'mist-blue:Mist Blue' 'sage:Sage' 'white:White')
       ;;
     *)
       colors=('silver:Silver (default)')
@@ -44,7 +50,15 @@ _screenflow() {
   esac
 
   local -a devices
-  devices=('iphone-17-pro:iPhone 17 Pro (default)' 'ipad-pro-11:iPad Pro 11" 'ipad-pro-13:iPad Pro 13"' 'iphone-13-pro:iPhone 13 Pro' 'iphone-15-pro:iPhone 15 Pro' 'iphone-14-pro:iPhone 14 Pro' 'iphone-16-pro:iPhone 16 Pro'')
+  devices=(
+    'iphone-17-pro:iPhone 17 Pro (default)'
+    'ipad-pro-11:iPad Pro 11'
+    'ipad-pro-13:iPad Pro 13'
+    'iphone-13-pro:iPhone 13 Pro'
+    'iphone-14-pro:iPhone 14 Pro'
+    'iphone-15-pro:iPhone 15 Pro'
+    'iphone-16-pro:iPhone 16 Pro'
+  )
 
   _arguments \
     '(-v --version)'{-v,--version}'[output the version number]' \
@@ -53,6 +67,10 @@ _screenflow() {
     '(-o --output)'{-o+,--output=}'[output file path]:output file:_files' \
     '--png[output as PNG instead of SVG]' \
     '--jpeg[output as JPEG instead of SVG]' \
+    '--video[create a 5-second zoom-in video animation (requires ffmpeg)]' \
+    '--devices[list all devices and their available colors]' \
+    '--set-default[save --device and/or --color as your personal defaults]' \
+    '--show-config[show your saved defaults]' \
     '--device=[device frame]:device:->devices' \
     '--color=[frame color]:color:->colors' \
     ':screenshot:_files -g "*.png *.jpg *.jpeg"'

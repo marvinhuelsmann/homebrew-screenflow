@@ -2,6 +2,7 @@ import { Command } from 'commander';
 import { DEVICES } from './composer';
 import { version } from '../package.json';
 import { frameAction } from './commands/frame';
+import { videoAction } from './commands/video';
 import { setDefaultAction } from './commands/setDefault';
 import { devicesAction } from './commands/devices';
 import { showConfigAction } from './commands/showConfig';
@@ -52,10 +53,15 @@ function buildProgram(): Command {
     .option('--devices', 'List all devices and their available colors')
     .option('--set-default', 'Save --device and/or --color as your personal defaults')
     .option('--show-config', 'Show your saved defaults')
+    .option('--video', 'Create a 4-second zoom-in video animation (requires ffmpeg)')
     .option('--author', 'About the author')
     .action(async (file: string, options) => {
       try {
-        await frameAction(file, options);
+        if (options.video) {
+          await videoAction(file, options);
+        } else {
+          await frameAction(file, options);
+        }
       } catch (err) {
         console.error('');
         console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);

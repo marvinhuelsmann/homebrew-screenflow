@@ -70,6 +70,34 @@ export const FRAMES: Record<string, FrameSpec> = {
     cornerRadius: 58,
     colors: {
       'dessert-titanium': 'dessert-titanium.svg',
+      'natural': 'natural.svg',
+      'white': 'white.svg',
+      'black': 'black.svg',
+    },
+  },
+  'iphone-air': {
+    canvas: { w: 1380, h: 2880 },
+    screen: { x: 60, y: 72, w: 1260, h: 2736 },
+    frameType: 'raster',
+    cornerRadius: 185,
+    colors: {
+      'black': 'black.svg',
+      'blue': 'blue.svg',
+      'gold': 'gold.svg',
+      'white': 'white.svg',
+    },
+  },
+  'iphone-17': {
+    canvas: { w: 1350, h: 2760 },
+    screen: { x: 72, y: 69, w: 1206, h: 2622 },
+    frameType: 'raster',
+    cornerRadius: 190,
+    colors: {
+      'black': 'black.svg',
+      'lavender': 'lavender.svg',
+      'mist-blue': 'mist-blue.svg',
+      'sage': 'sage.svg',
+      'white': 'white.svg',
     },
   },
 };

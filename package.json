@@ -1,6 +1,6 @@
 {
   "name": "screenflow",
-  "version": "0.2.60",
+  "version": "0.3.0",
   "description": "CLI tool to create beautiful mockup device screenshots",
   "homepage": "https://github.com/marvinhuelsmann/screenflow",
   "repository": {
@@ -16,11 +16,12 @@
     "screenflow": "dist/index.js"
   },
   "scripts": {
-    "build": "tsc && cp -r src/frames/iphone-17-pro dist/frames/ && cp -r src/frames/ipad-pro-11 dist/frames/ && cp -r src/frames/ipad-pro-13 dist/frames/ && cp -r src/frames/iphone-13-pro dist/frames/ && cp -r src/frames/iphone-15-pro dist/frames/ && cp -r src/frames/iphone-14-pro dist/frames/ && cp -r src/frames/iphone-16-pro dist/frames/",
+    "build": "tsc && cp -r src/frames/iphone-17-pro dist/frames/ && cp -r src/frames/ipad-pro-11 dist/frames/ && cp -r src/frames/ipad-pro-13 dist/frames/ && cp -r src/frames/iphone-13-pro dist/frames/ && cp -r src/frames/iphone-15-pro dist/frames/ && cp -r src/frames/iphone-14-pro dist/frames/ && cp -r src/frames/iphone-16-pro dist/frames/ && cp -r src/frames/iphone-air dist/frames/ && cp -r src/frames/iphone-17 dist/frames/",
     "prepare": "npm run build",
     "dev": "ts-node src/index.ts",
     "start": "node dist/index.js",
-    "add-device": "node scripts/add-device.js"
+    "add-device": "node scripts/add-device.js",
+    "add-color": "node scripts/add-color.js"
   },
   "dependencies": {
     "@inquirer/prompts": "^8.4.3",

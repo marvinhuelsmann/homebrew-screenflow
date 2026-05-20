@@ -61,87 +61,57 @@ function parseSvgCanvas(svgContent) {
   throw new Error('Could not parse canvas size from SVG');
 }
 
-async function detectScreenFromBuffer(pngBuffer, xFraction = 0.5) {
+// Unified screen + corner detector that works for both solid-body and thin-outline frames.
+// Strategy: scan outward from an interior point (30% left, 70% down) to find the inner
+// edges of the phone border, then at the top row figure out where the screen actually
+// starts (skipping background + corner arc) to derive the corner radius.
+async function detectScreenAndCorner(pngBuffer) {
   const { data, info } = await sharp(pngBuffer).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const { width, height, channels } = info;
+  const isOpaque = (x, y) => data[(y * width + x) * channels + 3] >= 64;
 
-  // Scan at xFraction column for y transitions, find largest transparent span = screen
-  const cx = Math.floor(width * xFraction);
-  const ySegs = [];
-  let segStart = 0;
-  let segOpaque = data[cx * channels + 3] > 10;
-  for (let y = 1; y < height; y++) {
-    const opaque = data[(y * width + cx) * channels + 3] > 10;
-    if (opaque !== segOpaque) {
-      ySegs.push({ start: segStart, end: y - 1, opaque: segOpaque });
-      segStart = y;
-      segOpaque = opaque;
-    }
+  // Interior start point — well clear of Dynamic Island (center) and all four corners
+  const sx = Math.floor(width * 0.30);
+  const sy = Math.floor(height * 0.70);
+
+  // Walk each direction until hitting an opaque phone-border pixel
+  let xL = sx; while (xL > 0 && !isOpaque(xL, sy)) xL--;
+  let xR = sx; while (xR < width - 1 && !isOpaque(xR, sy)) xR++;
+  let yT = sy; while (yT > 0 && !isOpaque(sx, yT)) yT--;
+  let yB = sy; while (yB < height - 1 && !isOpaque(sx, yB)) yB++;
+
+  const screen = { x: xL + 1, y: yT + 1, w: xR - xL - 1, h: yB - yT - 1 };
+  const canvas = { w: width, h: height };
+
+  // Corner radius: at the top screen row find where the screen area actually begins.
+  // • Solid-body frame: screen.x is opaque (corner body) — scan right to first transparent.
+  // • Thin-outline frame: screen.x is transparent background — skip bg, skip corner arc,
+  //   land on first transparent screen pixel.
+  let screenStartX = screen.x;
+  if (!isOpaque(screen.x, screen.y)) {
+    let x = screen.x;
+    while (x < screen.x + screen.w && !isOpaque(x, screen.y)) x++; // skip bg
+    while (x < screen.x + screen.w && isOpaque(x, screen.y)) x++;  // skip corner arc
+    screenStartX = x;
+  } else {
+    while (screenStartX < screen.x + screen.w && isOpaque(screenStartX, screen.y)) screenStartX++;
   }
-  ySegs.push({ start: segStart, end: height - 1, opaque: segOpaque });
+  const cornerRadius = screenStartX - screen.x;
 
-  const screenYSeg = ySegs
-    .filter(s => !s.opaque)
-    .sort((a, b) => (b.end - b.start) - (a.end - a.start))[0];
-  if (!screenYSeg) throw new Error('Could not find transparent screen region in Y axis');
-
-  const screenTop    = screenYSeg.start;
-  const screenBottom = screenYSeg.end;
-  const midY         = Math.floor((screenTop + screenBottom) / 2);
-
-  // Scan that row for x transitions
-  const xSegs = [];
-  let xSegStart = 0;
-  let xSegOpaque = data[(midY * width) * channels + 3] > 10;
-  for (let x = 1; x < width; x++) {
-    const opaque = data[(midY * width + x) * channels + 3] > 10;
-    if (opaque !== xSegOpaque) {
-      xSegs.push({ start: xSegStart, end: x - 1, opaque: xSegOpaque });
-      xSegStart = x;
-      xSegOpaque = opaque;
-    }
-  }
-  xSegs.push({ start: xSegStart, end: width - 1, opaque: xSegOpaque });
-
-  const screenXSeg = xSegs
-    .filter(s => !s.opaque)
-    .sort((a, b) => (b.end - b.start) - (a.end - a.start))[0];
-  if (!screenXSeg) throw new Error('Could not find transparent screen region in X axis');
-
-  return {
-    canvas: { w: width, h: height },
-    screen: {
-      x: screenXSeg.start,
-      y: screenTop,
-      w: screenXSeg.end - screenXSeg.start + 1,
-      h: screenBottom - screenTop + 1,
-    },
-  };
+  return { canvas, screen, cornerRadius };
 }
 
 async function detectRasterScreen(svgContent) {
-  const match = svgContent.match(/xlink:href="data:image\/png;base64,([^"]+)"/);
+  // Support both xlink:href (older Figma exports) and plain href
+  let match = svgContent.match(/xlink:href="data:image\/png;base64,([^"]+)"/);
+  if (!match) match = svgContent.match(/href="data:image\/png;base64,([^"]+)"/);
   if (!match) throw new Error('No embedded PNG found in raster frame SVG');
-  return detectScreenFromBuffer(Buffer.from(match[1], 'base64'));
-}
-
-async function detectCornerRadiusFromBuffer(pngBuffer, screen) {
-  const { data, info } = await sharp(pngBuffer).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-  const { width, channels } = info;
-  // Scan the leftmost screen column downward — corner curve ends where pixels go transparent
-  const x = screen.x;
-  for (let y = screen.y; y < screen.y + screen.h; y++) {
-    if (data[(y * width + x) * channels + 3] <= 10) return y - screen.y;
-  }
-  return 0;
+  return detectScreenAndCorner(Buffer.from(match[1], 'base64'));
 }
 
 async function detectOverlayScreen(svgContent) {
   const pngBuffer = await sharp(Buffer.from(svgContent)).png().toBuffer();
-  // Scan at 15% from left to avoid center notch/dynamic-island blocking the top boundary
-  const result = await detectScreenFromBuffer(pngBuffer, 0.15);
-  result.cornerRadius = await detectCornerRadiusFromBuffer(pngBuffer, result.screen);
-  return result;
+  return detectScreenAndCorner(pngBuffer);
 }
 
 // ── File updaters ─────────────────────────────────────────────────────────────
@@ -158,7 +128,7 @@ function updateFramesIndex(deviceId, frameType, canvas, screen, colors, cornerRa
   const colorLines = colors.map(c => `      '${c}': '${c}.svg',`).join('\n');
   const frameTypeLine = (frameType === 'raster' || frameType === 'overlay')
     ? `\n    frameType: '${frameType}',` : '';
-  const cornerRadiusLine = (frameType === 'overlay' && cornerRadius > 0)
+  const cornerRadiusLine = ((frameType === 'overlay' || frameType === 'raster') && cornerRadius > 0)
     ? `\n    cornerRadius: ${cornerRadius},` : '';
 
   const entry = `  '${deviceId}': {
@@ -244,7 +214,11 @@ function updateReadme(deviceId, colors, displayName) {
 
   const colorList = colors.map(c => `\`${c}\``).join(', ');
   const row = `| ${displayName} | \`${deviceId}\` | ${colorList} |`;
-  content = content.replace(/(^\| .+ \|\n)(^---$)/m, `$1${row}\n$2`);
+  // Append after the last | row in the Supported Devices table (before the blank line)
+  content = content.replace(
+    /(### Supported Devices\n\n\| Device[^\n]+\n\|[^\n]+\n)((?:\|[^\n]+\n)*)/,
+    (_, header, tableRows) => header + tableRows + row + '\n'
+  );
 
   fs.writeFileSync(filePath, content, 'utf8');
 }
@@ -285,11 +259,12 @@ async function main() {
   } else if (isRaster) {
     frameType = 'raster';
     process.stdout.write('\nDetecting screen bounds from PNG... ');
-    ({ canvas, screen } = await detectRasterScreen(firstSvg));
+    ({ canvas, screen, cornerRadius } = await detectRasterScreen(firstSvg));
     console.log('done');
     console.log(`Frame type: raster`);
     console.log(`Canvas: ${canvas.w} x ${canvas.h}`);
     console.log(`Screen: x=${screen.x} y=${screen.y} w=${screen.w} h=${screen.h}`);
+    console.log(`Corner radius: ${cornerRadius}`);
   } else {
     // Transparent SVG overlay (strokes/outlines on transparent background)
     frameType = 'overlay';

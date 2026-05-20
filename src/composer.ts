@@ -80,11 +80,16 @@ async function composeRaster(
   outputPath: string, format: Format,
 ): Promise<void> {
   const frameBuffer = extractEmbeddedPng(frameSvg);
+  const r = spec.cornerRadius ?? 0;
 
-  const screenshot = await sharp(inputPath)
+  let screenshot = await sharp(inputPath)
     .resize(spec.screen.w, spec.screen.h, { fit: 'cover', position: 'top' })
     .png()
     .toBuffer();
+
+  if (r > 0) {
+    screenshot = await roundedClip(screenshot, spec.screen.w, spec.screen.h, r);
+  }
 
   if (format === 'svg') {
     const screenshotB64 = screenshot.toString('base64');

@@ -50,8 +50,12 @@ All other code (composer, CLI listing, completions) derives from this registry.
 
 For **vector frames** the script cannot auto-detect screen coordinates — verify and correct the `screen` values in `src/frames/index.ts` manually.
 
+## Versioning rule
+
+**Every time any change is made to this repository, bump the patch version in `package.json` before finishing.** Increment the last number (e.g. `0.2.58` → `0.2.59`). No exceptions — every change ships a new version.
+
 ## Release workflow
 
-Every time you commit and push, Bump `"version"` in `package.json`, commit, push to `master`. The **Auto Tag** and Release workflow (`.github/workflows/tag.yml`) reads the version and pushes a `v*` tag automatically. The **Release** workflow (`.github/workflows/release.yml`) then creates the GitHub release and updates `Formula/screenflow.rb` with the new tarball URL and SHA256.
+Bump `"version"` in `package.json`, commit, push to `master`. The **Auto Tag** and Release workflow (`.github/workflows/tag.yml`) reads the version and pushes a `v*` tag automatically. The **Release** workflow (`.github/workflows/release.yml`) then creates the GitHub release and updates `Formula/screenflow.rb` with the new tarball URL and SHA256.
 
 The source code and Homebrew formula live in the same repo (`homebrew-screenflow`). `brew tap marvinhuelsmann/screenflow` resolves to this repo because Homebrew prepends `homebrew-` to tap repo names.
