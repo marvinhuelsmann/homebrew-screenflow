@@ -88,7 +88,7 @@ export const FRAMES: Record<string, FrameSpec> = {
   },
   'imac': {
     canvas: { w: 4096, h: 3485 },
-    screen: { x: 1229, y: 2440, w: 3796, h: 2000 },
+    screen: { x: 121, y: 129, w: 3854, h: 2167 },
     frameType: 'raster',
     colors: {
       'blue': 'blue.svg',

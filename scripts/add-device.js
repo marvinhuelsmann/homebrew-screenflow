@@ -61,22 +61,36 @@ function parseSvgCanvas(svgContent) {
   throw new Error('Could not parse canvas size from SVG');
 }
 
-// Screen bounds detector: scan from an interior point (30% left, 70% down) to find
-// screen edges by walking toward each border until hitting an opaque frame pixel.
+// Screen bounds detector: tries several candidate interior points and picks the one
+// that produces the largest (most plausible) screen area.
 async function detectScreenBounds(pngBuffer) {
   const { data, info } = await sharp(pngBuffer).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const { width, height, channels } = info;
   const isOpaque = (x, y) => data[(y * width + x) * channels + 3] > 0;
+  const isTransparent = (x, y) => !isOpaque(x, y);
 
-  const sx = Math.floor(width * 0.30);
-  const sy = Math.floor(height * 0.70);
+  // Candidate seed points to try (xFrac, yFrac). Covers phones (centre),
+  // iMac-style landscape monitors (upper area), and tablets (various).
+  const candidates = [
+    [0.50, 0.30], [0.50, 0.50], [0.30, 0.50],
+    [0.50, 0.20], [0.50, 0.70], [0.30, 0.70],
+  ];
 
-  let xL = sx; while (xL > 0 && !isOpaque(xL, sy)) xL--;
-  let xR = sx; while (xR < width - 1 && !isOpaque(xR, sy)) xR++;
-  let yT = sy; while (yT > 0 && !isOpaque(sx, yT)) yT--;
-  let yB = sy; while (yB < height - 1 && !isOpaque(sx, yB)) yB++;
+  let best = null;
+  for (const [xf, yf] of candidates) {
+    const cx = Math.floor(width * xf);
+    const cy = Math.floor(height * yf);
+    if (isOpaque(cx, cy)) continue; // seed is inside the frame, not the screen
+    let xL = cx; while (xL > 0 && isTransparent(xL, cy)) xL--;
+    let xR = cx; while (xR < width - 1 && isTransparent(xR, cy)) xR++;
+    let yT = cy; while (yT > 0 && isTransparent(cx, yT)) yT--;
+    let yB = cy; while (yB < height - 1 && isTransparent(cx, yB)) yB++;
+    const w = xR - xL - 1, h = yB - yT - 1;
+    if (w > 0 && h > 0 && (!best || w * h > best.w * best.h))
+      best = { x: xL + 1, y: yT + 1, w, h };
+  }
 
-  const screen = { x: xL + 1, y: yT + 1, w: xR - xL - 1, h: yB - yT - 1 };
+  const screen = best ?? { x: 0, y: 0, w: -1, h: -1 };
   const canvas = { w: width, h: height };
   return { canvas, screen, data, info };
 }
