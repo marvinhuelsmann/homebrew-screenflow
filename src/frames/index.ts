@@ -3,7 +3,7 @@ export interface FrameSpec {
   screen: { x: number; y: number; w: number; h: number };
   colors: Record<string, string>; // color name → svg filename within device folder
   frameType?: 'vector' | 'raster' | 'overlay'; // default: 'vector'
-  cornerRadius?: number; // overlay frames only — clips screenshot to device's rounded screen
+  cornerRadius?: number; // clips screenshot corners to match the frame's rounded screen edge
 }
 
 export const FRAMES: Record<string, FrameSpec> = {
@@ -34,33 +34,6 @@ export const FRAMES: Record<string, FrameSpec> = {
     colors: {
       'silver': 'silver.svg',
       'space-gray': 'space-gray.svg',
-    },
-  },
-  'iphone-13-pro': {
-    canvas: { w: 430, h: 884 },
-    screen: { x: 20, y: 21, w: 390, h: 842 },
-    frameType: 'overlay',
-    cornerRadius: 52,
-    colors: {
-      'sierra-blue': 'sierra-blue.svg',
-    },
-  },
-  'iphone-15-pro': {
-    canvas: { w: 423, h: 882 },
-    screen: { x: 15, y: 16, w: 393, h: 850 },
-    frameType: 'overlay',
-    cornerRadius: 58,
-    colors: {
-      'titanium-nature': 'titanium-nature.svg',
-    },
-  },
-  'iphone-14-pro': {
-    canvas: { w: 427, h: 886 },
-    screen: { x: 17, y: 18, w: 393, h: 850 },
-    frameType: 'overlay',
-    cornerRadius: 47,
-    colors: {
-      'deep-purple': 'deep-purple.svg',
     },
   },
   'iphone-16-pro': {
@@ -98,6 +71,33 @@ export const FRAMES: Record<string, FrameSpec> = {
       'mist-blue': 'mist-blue.svg',
       'sage': 'sage.svg',
       'white': 'white.svg',
+    },
+  },
+  'iphone-16': {
+    canvas: { w: 1359, h: 2736 },
+    screen: { x: 90, y: 90, w: 1179, h: 2556 },
+    frameType: 'raster',
+    cornerRadius: 165,
+    colors: {
+      'black': 'black.svg',
+      'pink': 'pink.svg',
+      'teal': 'teal.svg',
+      'ultramarine': 'ultramarine.svg',
+      'white': 'white.svg',
+    },
+  },
+  'imac': {
+    canvas: { w: 4096, h: 3485 },
+    screen: { x: 1229, y: 2440, w: 3796, h: 2000 },
+    frameType: 'raster',
+    colors: {
+      'blue': 'blue.svg',
+      'green': 'green.svg',
+      'orange': 'orange.svg',
+      'pink': 'pink.svg',
+      'purple': 'purple.svg',
+      'silver': 'silver.svg',
+      'yellow': 'yellow.svg',
     },
   },
 };

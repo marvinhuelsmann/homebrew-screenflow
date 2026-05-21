@@ -11,7 +11,7 @@ complete -c screenflow      -l show-config -d 'Show your saved defaults'
 
 # Devices
 complete -c screenflow -l device -r -d 'Device frame' \
-  -a 'iphone-17-pro\t"iPhone 17 Pro (default)" ipad-pro-11\t"iPad Pro 11" ipad-pro-13\t"iPad Pro 13" iphone-13-pro\t"iPhone 13 Pro" iphone-14-pro\t"iPhone 14 Pro" iphone-15-pro\t"iPhone 15 Pro" iphone-16-pro\t"iPhone 16 Pro" iphone-air\t"iPhone Air"'
+  -a 'iphone-17-pro\t"iPhone 17 Pro (default)" ipad-pro-11\t"iPad Pro 11" ipad-pro-13\t"iPad Pro 13" iphone-13-pro\t"iPhone 13 Pro" iphone-14-pro\t"iPhone 14 Pro" iphone-15-pro\t"iPhone 15 Pro" iphone-16-pro\t"iPhone 16 Pro" iphone-air\t"iPhone Air" imac\t"Imac"'
 
 # Colors — scoped per device (add a new block for each new device)
 complete -c screenflow -l color -r -d 'Frame color' \
@@ -45,3 +45,7 @@ complete -c screenflow -l color -r -d 'Frame color' \
 complete -c screenflow -l color -r -d 'Frame color' \
   -n '__fish_seen_argument --device iphone-air' \
   -a 'black\t"Black" blue\t"Blue" gold\t"Gold" white\t"White"'
+
+complete -c screenflow -l color -r -d 'Frame color' \
+  -n '__fish_seen_argument --device imac' \
+  -a 'blue\t"Blue" green\t"Green" orange\t"Orange" pink\t"Pink" purple\t"Purple" silver\t"Silver" yellow\t"Yellow"'

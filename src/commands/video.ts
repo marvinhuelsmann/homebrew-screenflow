@@ -3,6 +3,7 @@ import os from 'os';
 import fs from 'fs';
 import { spawnSync } from 'child_process';
 import { confirm } from '@inquirer/prompts';
+import sharp from 'sharp';
 import { compose } from '../composer';
 import { Config } from '../config';
 import { DEFAULT_DEVICE } from '../frames';
@@ -46,21 +47,44 @@ export async function videoAction(file: string, options: VideoOptions): Promise<
     ? path.resolve(options.output)
     : path.join(dir, `${base}_${device}_${color}.mp4`);
 
-  const tmpPng = path.join(os.tmpdir(), `screenflow_${Date.now()}.png`);
+  const ts = Date.now();
+  const tmpPng  = path.join(os.tmpdir(), `screenflow_${ts}.png`);
+  const tmpMask = path.join(os.tmpdir(), `screenflow_mask_${ts}.png`);
 
   process.stdout.write(`Composing ${path.basename(inputPath)} ... `);
   await compose(inputPath, device, tmpPng, 'png', color);
+
+  // Flatten transparency to black before ffmpeg so bilinear scale doesn't
+  // produce gray fringes at semi-transparent device frame edges.
+  const flatBuf = await sharp(tmpPng).flatten({ background: { r: 0, g: 0, b: 0 } }).png().toBuffer();
+  fs.writeFileSync(tmpPng, flatBuf);
+
+  // How many pixels to compress each side of the bottom edge — controls tilt strength.
+  const perspOffset = 200;
+
+  // Pre-render the two corner triangles that fall outside the perspective
+  // trapezoid as a static black mask (much faster than per-pixel geq eval).
+  const maskSvg = [
+    `<svg width="1920" height="1080" xmlns="http://www.w3.org/2000/svg">`,
+    `<polygon points="0,0 ${perspOffset},1080 0,1080" fill="black"/>`,
+    `<polygon points="1920,0 ${1920 - perspOffset},1080 1920,1080" fill="black"/>`,
+    `</svg>`,
+  ].join('');
+  await sharp(Buffer.from(maskSvg)).png().toFile(tmpMask);
+
   console.log('done');
 
   // 4 s total @ 60 fps = 240 frames (60 fps → smooth motion)
-  // Phase 1 (frames 0–50, ~0.8 s): full mockup visible → zoom 1× → 2.2× toward bottom
-  // Phase 2 (frames 50–240, ~3.2 s): pan straight up, cosine ease-in-out
+  // Phase 1 (frames 0–50, ~0.8 s): zoom 1× → 2.2× with cosine ease-out
+  // Phase 2 (frames 50–240, ~3.2 s): pan straight up with cosine ease-in-out
+  // Both phases reach the handoff point at near-zero velocity → seamless blend.
   const fps = 60;
   const d   = 240;  // total frames
   const p1  = 50;   // end of zoom-in phase
 
-  // Zoom expression: 1× at frame 0, 2.2× at frame p1, held after
-  const Z = `(1+1.2*min(on/${p1},1))`;
+  // Zoom: cosine ease-in-out so it decelerates into frame p1 instead of cutting hard
+  const zoomT  = `min(on/${p1},1)`;
+  const Z = `(1+1.2*(1-cos(PI*${zoomT}))/2)`;
 
   // Phase-2 ease-in-out progress (0 → 1 over frames p1 → d)
   const phase2 = `max((on-${p1})/${d - p1},0)`;
@@ -76,34 +100,40 @@ export async function videoAction(file: string, options: VideoOptions): Promise<
     `fps=${fps}`,
   ].join(':');
 
-  // 3-D perspective tilt: bottom edge compressed ~5 % each side,
+  // 3-D perspective tilt: bottom edge compressed ~10 % each side,
   // top edge full-width → device appears to tilt upward toward viewer
-  const persp = 'perspective=x0=0:y0=0:x1=1920:y1=0:x2=96:y2=1080:x3=1824:y3=1080:interpolation=linear';
+  const persp = `perspective=x0=0:y0=0:x1=1920:y1=0:x2=${perspOffset}:y2=1080:x3=${1920 - perspOffset}:y3=1080:interpolation=linear`;
 
-  const filter = [
+  const mainFilter = [
     'scale=1920:1080:force_original_aspect_ratio=decrease',
     'pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black',
     zoompan,
     persp,
   ].join(',');
 
+  // Overlay the static corner mask via filter_complex — a simple blit per
+  // frame, far faster than per-pixel geq expression evaluation.
+  const filterComplex = `[0:v]${mainFilter}[main];[main][1:v]overlay=0:0`;
+
   process.stdout.write(`Rendering video ${path.basename(outputPath)} ... `);
 
   const result = spawnSync('ffmpeg', [
     '-y',
-    '-loop', '1',
-    '-i', tmpPng,
-    '-vf', filter,
+    '-loop', '1', '-i', tmpPng,
+    '-loop', '1', '-i', tmpMask,
+    '-filter_complex', filterComplex,
     '-c:v', 'libx264',
+    '-profile:v', 'high',
     '-t', '4',
     '-pix_fmt', 'yuv420p',
     '-r', String(fps),
-    '-preset', 'fast',
-    '-crf', '18',
+    '-preset', 'slow',
+    '-crf', '14',
     outputPath,
   ], { stdio: ['ignore', 'pipe', 'pipe'] });
 
   fs.unlinkSync(tmpPng);
+  fs.unlinkSync(tmpMask);
 
   if (result.error) throw new Error(result.error.message);
   if (result.status !== 0) {

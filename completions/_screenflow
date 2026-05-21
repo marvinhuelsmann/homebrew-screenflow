@@ -44,6 +44,12 @@ _screenflow() {
     iphone-17)
       colors=('black:Black' 'lavender:Lavender' 'mist-blue:Mist Blue' 'sage:Sage' 'white:White')
       ;;
+    iphone-16)
+      colors=('black:Black' 'pink:Pink' 'teal:Teal' 'ultramarine:Ultramarine' 'white:White')
+      ;;
+    imac)
+      colors=('blue:Blue' 'green:Green' 'orange:Orange' 'pink:Pink' 'purple:Purple' 'silver:Silver' 'yellow:Yellow')
+      ;;
     *)
       colors=('silver:Silver (default)')
       ;;

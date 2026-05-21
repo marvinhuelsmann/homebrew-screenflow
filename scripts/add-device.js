@@ -61,20 +61,16 @@ function parseSvgCanvas(svgContent) {
   throw new Error('Could not parse canvas size from SVG');
 }
 
-// Unified screen + corner detector that works for both solid-body and thin-outline frames.
-// Strategy: scan outward from an interior point (30% left, 70% down) to find the inner
-// edges of the phone border, then at the top row figure out where the screen actually
-// starts (skipping background + corner arc) to derive the corner radius.
-async function detectScreenAndCorner(pngBuffer) {
+// Screen bounds detector: scan from an interior point (30% left, 70% down) to find
+// screen edges by walking toward each border until hitting an opaque frame pixel.
+async function detectScreenBounds(pngBuffer) {
   const { data, info } = await sharp(pngBuffer).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const { width, height, channels } = info;
-  const isOpaque = (x, y) => data[(y * width + x) * channels + 3] >= 64;
+  const isOpaque = (x, y) => data[(y * width + x) * channels + 3] > 0;
 
-  // Interior start point — well clear of Dynamic Island (center) and all four corners
   const sx = Math.floor(width * 0.30);
   const sy = Math.floor(height * 0.70);
 
-  // Walk each direction until hitting an opaque phone-border pixel
   let xL = sx; while (xL > 0 && !isOpaque(xL, sy)) xL--;
   let xR = sx; while (xR < width - 1 && !isOpaque(xR, sy)) xR++;
   let yT = sy; while (yT > 0 && !isOpaque(sx, yT)) yT--;
@@ -82,23 +78,53 @@ async function detectScreenAndCorner(pngBuffer) {
 
   const screen = { x: xL + 1, y: yT + 1, w: xR - xL - 1, h: yB - yT - 1 };
   const canvas = { w: width, h: height };
+  return { canvas, screen, data, info };
+}
 
-  // Corner radius: at the top screen row find where the screen area actually begins.
-  // • Solid-body frame: screen.x is opaque (corner body) — scan right to first transparent.
-  // • Thin-outline frame: screen.x is transparent background — skip bg, skip corner arc,
-  //   land on first transparent screen pixel.
-  let screenStartX = screen.x;
-  if (!isOpaque(screen.x, screen.y)) {
-    let x = screen.x;
-    while (x < screen.x + screen.w && !isOpaque(x, screen.y)) x++; // skip bg
-    while (x < screen.x + screen.w && isOpaque(x, screen.y)) x++;  // skip corner arc
-    screenStartX = x;
-  } else {
-    while (screenStartX < screen.x + screen.w && isOpaque(screenStartX, screen.y)) screenStartX++;
+// Corner radius detector using multi-angle diagonal scan.
+// Scans from the screen's top-left corner at several angles, finding where the diagonal
+// exits the opaque frame arc into the transparent screen hole. For each angle the measured
+// (dx, dy) pair satisfies the circle equation, giving R = (dx+dy) + sqrt(2*dx*dy).
+// Averaging over multiple angles cancels out pixel-grid quantisation error.
+function detectCornerRadius(data, info, sx, sy) {
+  const { width, height, channels } = info;
+  const isOpaque = (x, y) => data[(y * width + x) * channels + 3] >= 128;
+
+  const FACTOR = 2 + Math.sqrt(2); // exact: k*(2+√2) = R for 45° diagonal on a circle
+  const ratios = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+  const Rs = [];
+  const maxK = Math.floor(Math.min(width - sx, height - sy) / 2);
+
+  for (const ratio of ratios) {
+    let k = 0;
+    while (k < maxK && !isOpaque(sx + Math.round(ratio * k), sy + k)) k++; // skip transparent gap
+    while (k < maxK && isOpaque(sx + Math.round(ratio * k), sy + k)) k++;  // skip opaque arc
+    if (k >= maxK) continue;
+    const dx = Math.round(ratio * k);
+    const dy = k;
+    Rs.push(Math.round((dx + dy) + Math.sqrt(2 * dx * dy)));
   }
-  const cornerRadius = screenStartX - screen.x;
 
-  return { canvas, screen, cornerRadius };
+  if (Rs.length === 0) return 0;
+  return Math.round(Rs.reduce((a, b) => a + b, 0) / Rs.length);
+}
+
+// For overlay (thin-outline) SVG frames, parse the inner black stroke <rect> to get
+// the exact inner corner radius: rx - stroke_width/2.
+// This is more accurate than pixel scanning because it reads the design geometry directly.
+function parseOverlayCornerRadius(svgContent) {
+  const re = /<rect[^>]+>/g;
+  let m;
+  while ((m = re.exec(svgContent)) !== null) {
+    const rect = m[0];
+    const rxM    = rect.match(/rx="([^"]+)"/);
+    const swM    = rect.match(/stroke-width="([^"]+)"/);
+    const strokeM = rect.match(/stroke="([^"]+)"/);
+    if (rxM && swM && strokeM && /^(black|#000|#000000)$/i.test(strokeM[1])) {
+      return Math.round(parseFloat(rxM[1]) - parseFloat(swM[1]) / 2);
+    }
+  }
+  return null;
 }
 
 async function detectRasterScreen(svgContent) {
@@ -106,12 +132,19 @@ async function detectRasterScreen(svgContent) {
   let match = svgContent.match(/xlink:href="data:image\/png;base64,([^"]+)"/);
   if (!match) match = svgContent.match(/href="data:image\/png;base64,([^"]+)"/);
   if (!match) throw new Error('No embedded PNG found in raster frame SVG');
-  return detectScreenAndCorner(Buffer.from(match[1], 'base64'));
+  const pngBuffer = Buffer.from(match[1], 'base64');
+  const { canvas, screen, data, info } = await detectScreenBounds(pngBuffer);
+  const cornerRadius = detectCornerRadius(data, info, screen.x, screen.y);
+  return { canvas, screen, cornerRadius };
 }
 
 async function detectOverlayScreen(svgContent) {
   const pngBuffer = await sharp(Buffer.from(svgContent)).png().toBuffer();
-  return detectScreenAndCorner(pngBuffer);
+  const { canvas, screen, data, info } = await detectScreenBounds(pngBuffer);
+  // Prefer SVG geometry (exact) over pixel scan (approximate)
+  const cornerRadius = parseOverlayCornerRadius(svgContent)
+    ?? detectCornerRadius(data, info, screen.x, screen.y);
+  return { canvas, screen, cornerRadius };
 }
 
 // ── File updaters ─────────────────────────────────────────────────────────────

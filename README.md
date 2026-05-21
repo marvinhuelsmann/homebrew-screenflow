@@ -94,13 +94,12 @@ Output is always `1920 × 1080` H.264 MP4 at 60 fps, CRF 18.
 |---|---|---|
 | iPhone 17 Pro | `iphone-17-pro` | `silver`, `deep-blue`, `cosmic-orange` |
 | iPhone 16 Pro | `iphone-16-pro` | `dessert-titanium`, `black`, `natural`, `white` |
-| iPhone 15 Pro | `iphone-15-pro` | `titanium-nature` |
-| iPhone 14 Pro | `iphone-14-pro` | `deep-purple` |
-| iPhone 13 Pro | `iphone-13-pro` | `sierra-blue` |
 | iPad Pro 11" | `ipad-pro-11` | `silver`, `silver-with-apple-pencil`, `space-gray`, `space-gray-with-apple-pencil` |
 | iPad Pro 13" | `ipad-pro-13` | `silver`, `space-gray` |
 | iPhone Air | `iphone-air` | `black`, `blue`, `gold`, `white` |
 | iPhone 17" | `iphone-17` | `black`, `lavender`, `mist-blue`, `sage`, `white` |
+| iPhone 16" | `iphone-16` | `black`, `pink`, `teal`, `ultramarine`, `white` |
+| Imac | `imac` | `blue`, `green`, `orange`, `pink`, `purple`, `silver`, `yellow` |
 
 ## Updating
 
@@ -126,9 +125,6 @@ src/
       cosmic-orange.svg
     ipad-pro-11/
     ipad-pro-13/
-    iphone-13-pro/
-    iphone-14-pro/
-    iphone-15-pro/
     iphone-16-pro/
   commands/
     frame.ts        ← frame a screenshot
