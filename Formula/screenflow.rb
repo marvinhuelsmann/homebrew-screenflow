@@ -1,8 +1,8 @@
 class Screenflow < Formula
   desc "Wrap simulator screenshots in an iPhone device frame"
   homepage "https://github.com/marvinhuelsmann/screenflow"
-  url "https://github.com/marvinhuelsmann/homebrew-screenflow/archive/refs/tags/v0.3.1.tar.gz"
-  sha256 "1ca1c0f4cb75d8cb6fe58b0dc2abba1669d23367f0c59264b915af61b14194c4" # updated automatically by release workflow
+  url "https://github.com/marvinhuelsmann/homebrew-screenflow/archive/refs/tags/v0.3.11.tar.gz"
+  sha256 "e372c0ac7c7ea28f63cadc269925f6f4e9f2a5d7362529fdc3389a01e5c0e903" # updated automatically by release workflow
   license "MIT"
   head "https://github.com/marvinhuelsmann/screenflow.git", branch: "master"
 
