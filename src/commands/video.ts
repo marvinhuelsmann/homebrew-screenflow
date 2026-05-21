@@ -19,7 +19,6 @@ interface VideoOptions {
 
 const FPS = 60;
 const FRAMES = 240; // 4 s @ 60 fps
-const PERSP_OFFSET = 200;
 
 function ffmpegAvailable(): boolean {
   const r = spawnSync('ffmpeg', ['-version'], { stdio: 'ignore' });
@@ -39,6 +38,9 @@ async function ensureFfmpeg(): Promise<void> {
   if (!ffmpegAvailable()) throw new Error('ffmpeg still not found after install — check your PATH');
 }
 
+// fps= is intentionally omitted from zoompan — it is set as a standalone fps
+// filter before zoompan so input timestamps are normalised first, preventing
+// the frame-timing conflict that caused stutter at the start of animations.
 function buildZoompan(style: VideoStyle): string {
   const d = FRAMES;
 
@@ -56,20 +58,18 @@ function buildZoompan(style: VideoStyle): string {
       `x='iw/2-iw/(2*${Z})'`,
       `y='ih*(1-1/${Z})*(1-${eased})'`,
       `s=1920x1080`,
-      `fps=${FPS}`,
     ].join(':');
   }
 
   if (style === 'zoom-out') {
-    // Cosine ease zoom 2.2× → 1×, centered throughout
-    const Z = `(2.2-1.2*(1-cos(PI*min(on/${d - 1},1)))/2)`;
+    // Cosine ease zoom 1.8× → 1×, centered throughout
+    const Z = `(1.8-0.8*(1-cos(PI*min(on/${d - 1},1)))/2)`;
     return [
       `zoompan=z='${Z}'`,
       `d=${d}`,
       `x='iw/2-iw/(2*${Z})'`,
       `y='ih/2-ih/(2*${Z})'`,
       `s=1920x1080`,
-      `fps=${FPS}`,
     ].join(':');
   }
 
@@ -82,37 +82,32 @@ function buildZoompan(style: VideoStyle): string {
   const yMax    = `ih*(1-1/${zoom})`;
 
   if (style === 'pan-down') {
-    // Top → bottom
     return [
       `zoompan=z='${zoom}'`,
       `d=${d}`,
       `x='${xCenter}'`,
       `y='${yMax}*${eased}'`,
       `s=1920x1080`,
-      `fps=${FPS}`,
     ].join(':');
   }
 
   if (style === 'pan-left') {
-    // Right → left
     return [
       `zoompan=z='${zoom}'`,
       `d=${d}`,
       `x='${xMax}*(1-${eased})'`,
       `y='${yCenter}'`,
       `s=1920x1080`,
-      `fps=${FPS}`,
     ].join(':');
   }
 
-  // pan-right: left → right
+  // pan-right
   return [
     `zoompan=z='${zoom}'`,
     `d=${d}`,
     `x='${xMax}*${eased}'`,
     `y='${yCenter}'`,
     `s=1920x1080`,
-    `fps=${FPS}`,
   ].join(':');
 }
 
@@ -138,44 +133,31 @@ export async function videoAction(file: string, options: VideoOptions): Promise<
   process.stdout.write(`Composing ${path.basename(inputPath)} ... `);
   await compose(inputPath, device, tmpPng, 'png', color);
 
-  // Flatten transparency to black before ffmpeg so bilinear scale doesn't
-  // produce gray fringes at semi-transparent device frame edges.
+  // Flatten transparency to black so bilinear scale doesn't produce gray
+  // fringes at semi-transparent device frame edges.
   const flatBuf = await sharp(tmpPng).flatten({ background: { r: 0, g: 0, b: 0 } }).png().toBuffer();
   fs.writeFileSync(tmpPng, flatBuf);
-
-  const usePerspective = style !== 'zoom-in';
-  let tmpMask: string | null = null;
-
-  if (usePerspective) {
-    tmpMask = path.join(os.tmpdir(), `screenflow_mask_${ts}.png`);
-    const maskSvg = [
-      `<svg width="1920" height="1080" xmlns="http://www.w3.org/2000/svg">`,
-      `<polygon points="0,0 ${PERSP_OFFSET},1080 0,1080" fill="black"/>`,
-      `<polygon points="1920,0 ${1920 - PERSP_OFFSET},1080 1920,1080" fill="black"/>`,
-      `</svg>`,
-    ].join('');
-    await sharp(Buffer.from(maskSvg)).png().toFile(tmpMask);
-  }
 
   console.log('done');
 
   const zoompan = buildZoompan(style);
 
-  const baseFilters = [
+  // fps filter BEFORE zoompan normalises input timestamps — prevents the
+  // frame-timing conflict between -r on the input and zoompan's internal
+  // frame counter that causes stutter at the start of animations.
+  const vf = [
+    `fps=${FPS}`,
     'scale=1920:1080:force_original_aspect_ratio=decrease:flags=lanczos',
     'pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black',
     zoompan,
-  ];
+  ].join(',');
 
-  const persp = [
-    'perspective=',
-    `x0=0:y0=0:x1=1920:y1=0`,
-    `:x2=${PERSP_OFFSET}:y2=1080`,
-    `:x3=${1920 - PERSP_OFFSET}:y3=1080`,
-    ':interpolation=linear',
-  ].join('');
+  process.stdout.write(`Rendering video ${path.basename(outputPath)} [${style}] ... `);
 
-  const commonEncodeArgs = [
+  const result = spawnSync('ffmpeg', [
+    '-y',
+    '-loop', '1', '-i', tmpPng,
+    '-vf', vf,
     '-c:v', 'libx264',
     '-profile:v', 'high',
     '-level', '4.2',
@@ -186,35 +168,10 @@ export async function videoAction(file: string, options: VideoOptions): Promise<
     '-preset', 'slow',
     '-crf', '12',
     '-movflags', '+faststart',
-  ];
-
-  process.stdout.write(`Rendering video ${path.basename(outputPath)} [${style}] ... `);
-
-  let result;
-
-  if (usePerspective) {
-    const mainFilter = [...baseFilters, persp].join(',');
-    const filterComplex = `[0:v]${mainFilter}[main];[main][1:v]overlay=0:0`;
-    result = spawnSync('ffmpeg', [
-      '-y',
-      '-r', String(FPS), '-loop', '1', '-i', tmpPng,
-      '-r', String(FPS), '-loop', '1', '-i', tmpMask!,
-      '-filter_complex', filterComplex,
-      ...commonEncodeArgs,
-      outputPath,
-    ], { stdio: ['ignore', 'pipe', 'pipe'] });
-  } else {
-    result = spawnSync('ffmpeg', [
-      '-y',
-      '-r', String(FPS), '-loop', '1', '-i', tmpPng,
-      '-vf', baseFilters.join(','),
-      ...commonEncodeArgs,
-      outputPath,
-    ], { stdio: ['ignore', 'pipe', 'pipe'] });
-  }
+    outputPath,
+  ], { stdio: ['ignore', 'pipe', 'pipe'] });
 
   fs.unlinkSync(tmpPng);
-  if (tmpMask) fs.unlinkSync(tmpMask);
 
   if (result.error) throw new Error(result.error.message);
   if (result.status !== 0) {
