@@ -1,5 +1,4 @@
 import { Command } from 'commander';
-import { DEVICES } from './composer';
 import { version } from '../package.json';
 import { frameAction } from './commands/frame';
 import { videoAction } from './commands/video';
@@ -8,66 +7,87 @@ import { devicesAction } from './commands/devices';
 import { showConfigAction } from './commands/showConfig';
 import { authorAction } from './commands/author';
 
+const VALID_STYLES = ['zoom-in', 'zoom-out', 'pan-down', 'pan-left', 'pan-right'];
+
 export async function run(): Promise<void> {
-  // Handle flags that don't require <file> before commander parses
-  if (process.argv.includes('--set-default')) {
-    await setDefaultAction();
-    process.exit(0);
-  }
-  if (process.argv.includes('--devices')) {
-    devicesAction();
-    process.exit(0);
-  }
-  if (process.argv.includes('--show-config')) {
-    showConfigAction();
-    process.exit(0);
-  }
-  if (process.argv.includes('--author')) {
-    authorAction();
-    process.exit(0);
-  }
+  const program = buildProgram();
 
   if (process.argv.length <= 2) {
-    buildProgram().help();
+    program.help();
     return;
   }
 
-  await buildProgram().parseAsync(process.argv);
+  await program.parseAsync(process.argv);
 }
 
 function buildProgram(): Command {
-  const program = new Command();
-
-  program
+  const program = new Command()
     .name('screenflow')
     .description('Wrap simulator screenshots in a device frame — pixel-perfect, no clock, no Dynamic Island')
-    .version(version, '-v, --version');
-
-  program
-    .argument('<file>', 'Screenshot image file (PNG, JPG)')
+    .version(version, '-v, --version')
+    .helpOption('-h, --help', 'Show help')
+    .argument('[file]', 'Screenshot image file (PNG, JPG)')
     .option('-o, --output <path>', 'Output file path')
     .option('--png', 'Output as PNG instead of SVG')
     .option('--jpeg', 'Output as JPEG instead of SVG')
-    .option('--color <color>', 'Frame color for the chosen device')
-    .option('--device <device>', `Device frame: ${DEVICES.join(', ')}`)
-    .option('--devices', 'List all devices and their available colors')
-    .option('--set-default', 'Save --device and/or --color as your personal defaults')
-    .option('--show-config', 'Show your saved defaults')
-    .option('--video', 'Create a 4-second zoom-in video animation (requires ffmpeg)')
-    .option('--author', 'About the author')
-    .action(async (file: string, options) => {
+    .option('-d, --device <device>', 'Device frame (e.g. iphone-17-pro)')
+    .option('-c, --color <color>', 'Frame color for the chosen device')
+    .action(async (file: string | undefined, options) => {
+      if (!file) {
+        program.help();
+        return;
+      }
       try {
-        if (options.video) {
-          await videoAction(file, options);
-        } else {
-          await frameAction(file, options);
-        }
+        await frameAction(file, options);
       } catch (err) {
         console.error('');
         console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
         process.exit(1);
       }
     });
+
+  program
+    .command('video <file>')
+    .description('Create a 4-second animated marketing video (requires ffmpeg)')
+    .option('-o, --output <path>', 'Output file path')
+    .option('-d, --device <device>', 'Device frame (e.g. iphone-17-pro)')
+    .option('-c, --color <color>', 'Frame color for the chosen device')
+    .option('-s, --style <style>', `Animation style: ${VALID_STYLES.join(' | ')}`, 'zoom-in')
+    .action(async (file: string, options) => {
+      if (!VALID_STYLES.includes(options.style)) {
+        console.error(`\nError: Unknown style "${options.style}". Choose from: ${VALID_STYLES.join(', ')}\n`);
+        process.exit(1);
+      }
+      try {
+        await videoAction(file, options);
+      } catch (err) {
+        console.error('');
+        console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
+        process.exit(1);
+      }
+    });
+
+  program
+    .command('devices')
+    .description('List all available devices and their colors')
+    .action(devicesAction);
+
+  program
+    .command('config')
+    .description('Show your saved defaults')
+    .action(showConfigAction);
+
+  program
+    .command('set-default')
+    .description('Set a default device and color interactively')
+    .action(async () => {
+      await setDefaultAction();
+    });
+
+  program
+    .command('author')
+    .description('About the author')
+    .action(authorAction);
 
   return program;
 }

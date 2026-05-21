@@ -1,51 +1,64 @@
-complete -c screenflow -s v -l version    -d 'Output the version number'
-complete -c screenflow -s h -l help       -d 'Display help'
-complete -c screenflow      -l author     -d 'About the author'
-complete -c screenflow -s o -l output  -r -d 'Output file path'
-complete -c screenflow      -l png        -d 'Output as PNG instead of SVG'
-complete -c screenflow      -l jpeg       -d 'Output as JPEG instead of SVG'
-complete -c screenflow      -l video      -d 'Create a 5-second zoom-in video animation (requires ffmpeg)'
-complete -c screenflow      -l devices    -d 'List all devices and their available colors'
-complete -c screenflow      -l set-default -d 'Save --device and/or --color as your personal defaults'
-complete -c screenflow      -l show-config -d 'Show your saved defaults'
+function __fish_screenflow_no_subcommand
+    for i in (commandline -opc)
+        if contains -- $i video devices config set-default author
+            return 1
+        end
+    end
+    return 0
+end
+
+# Global flags
+complete -c screenflow -s v -l version -d 'Output the version number'
+complete -c screenflow -s h -l help    -d 'Display help'
+
+# Subcommands (only when no subcommand has been given yet)
+complete -c screenflow -n '__fish_screenflow_no_subcommand' -f -a 'video'       -d 'Create a 4-second animated marketing video'
+complete -c screenflow -n '__fish_screenflow_no_subcommand' -f -a 'devices'     -d 'List all available devices and their colors'
+complete -c screenflow -n '__fish_screenflow_no_subcommand' -f -a 'config'      -d 'Show saved defaults'
+complete -c screenflow -n '__fish_screenflow_no_subcommand' -f -a 'set-default' -d 'Set a default device and color interactively'
+complete -c screenflow -n '__fish_screenflow_no_subcommand' -f -a 'author'      -d 'About the author'
+
+# Frame options (no subcommand — default frame command)
+complete -c screenflow -n '__fish_screenflow_no_subcommand' -s o -l output -r -d 'Output file path'
+complete -c screenflow -n '__fish_screenflow_no_subcommand'      -l png       -d 'Output as PNG instead of SVG'
+complete -c screenflow -n '__fish_screenflow_no_subcommand'      -l jpeg      -d 'Output as JPEG instead of SVG'
+complete -c screenflow -n '__fish_screenflow_no_subcommand' -s d -l device -r -d 'Device frame'
+complete -c screenflow -n '__fish_screenflow_no_subcommand' -s c -l color  -r -d 'Frame color'
+
+# Video options
+complete -c screenflow -n '__fish_seen_subcommand_from video' -s o -l output -r -d 'Output file path'
+complete -c screenflow -n '__fish_seen_subcommand_from video' -s d -l device -r -d 'Device frame'
+complete -c screenflow -n '__fish_seen_subcommand_from video' -s c -l color  -r -d 'Frame color'
+complete -c screenflow -n '__fish_seen_subcommand_from video' -s s -l style  -r -d 'Animation style' \
+  -a 'zoom-in\t"Zoom in 1× → 2.2×, pan upward (default)" zoom-out\t"Zoom out 2.2× → 1×" pan-down\t"Pan top → bottom" pan-left\t"Pan right → left" pan-right\t"Pan left → right"'
 
 # Devices
-complete -c screenflow -l device -r -d 'Device frame' \
-  -a 'iphone-17-pro\t"iPhone 17 Pro (default)" ipad-pro-11\t"iPad Pro 11" ipad-pro-13\t"iPad Pro 13" iphone-13-pro\t"iPhone 13 Pro" iphone-14-pro\t"iPhone 14 Pro" iphone-15-pro\t"iPhone 15 Pro" iphone-16-pro\t"iPhone 16 Pro" iphone-air\t"iPhone Air" imac\t"Imac"'
+set -l __screenflow_devices 'iphone-17-pro\t"iPhone 17 Pro (default)" iphone-17\t"iPhone 17" iphone-16-pro\t"iPhone 16 Pro" iphone-16\t"iPhone 16" iphone-air\t"iPhone Air" ipad-pro-11\t"iPad Pro 11" ipad-pro-13\t"iPad Pro 13" imac\t"iMac"'
 
-# Colors — scoped per device (add a new block for each new device)
-complete -c screenflow -l color -r -d 'Frame color' \
-  -n 'not __fish_seen_argument --device; or __fish_seen_argument --device iphone-17-pro' \
-  -a 'silver\t"Silver (default)" deep-blue\t"Deep Blue" cosmic-orange\t"Cosmic Orange"'
+complete -c screenflow -n '__fish_screenflow_no_subcommand'    -l device -r -a $__screenflow_devices
+complete -c screenflow -n '__fish_seen_subcommand_from video'  -l device -r -a $__screenflow_devices
 
-complete -c screenflow -l color -r -d 'Frame color' \
-  -n '__fish_seen_argument --device ipad-pro-11' \
-  -a 'silver\t"Silver" silver-with-apple-pencil\t"Silver with Apple Pencil" space-gray\t"Space Gray" space-gray-with-apple-pencil\t"Space Gray with Apple Pencil"'
+# Colors — scoped per device
+set -l __sf_colors_17pro  'silver\t"Silver (default)" deep-blue\t"Deep Blue" cosmic-orange\t"Cosmic Orange"'
+set -l __sf_colors_17     'black\t"Black" lavender\t"Lavender" mist-blue\t"Mist Blue" sage\t"Sage" white\t"White"'
+set -l __sf_colors_16pro  'dessert-titanium\t"Desert Titanium" black\t"Black" natural\t"Natural" white\t"White"'
+set -l __sf_colors_16     'black\t"Black" pink\t"Pink" teal\t"Teal" ultramarine\t"Ultramarine" white\t"White"'
+set -l __sf_colors_air    'black\t"Black" blue\t"Blue" gold\t"Gold" white\t"White"'
+set -l __sf_colors_11     'silver\t"Silver" silver-with-apple-pencil\t"Silver + Pencil" space-gray\t"Space Gray" space-gray-with-apple-pencil\t"Space Gray + Pencil"'
+set -l __sf_colors_13     'silver\t"Silver" space-gray\t"Space Gray"'
+set -l __sf_colors_imac   'blue\t"Blue" green\t"Green" orange\t"Orange" pink\t"Pink" purple\t"Purple" silver\t"Silver" yellow\t"Yellow"'
 
-complete -c screenflow -l color -r -d 'Frame color' \
-  -n '__fish_seen_argument --device ipad-pro-13' \
-  -a 'silver\t"Silver" space-gray\t"Space Gray"'
+for __sf_sub in '' video
+    set -l __sf_cond (test -n "$__sf_sub"; and echo "__fish_seen_subcommand_from $__sf_sub"; or echo '__fish_screenflow_no_subcommand')
 
-complete -c screenflow -l color -r -d 'Frame color' \
-  -n '__fish_seen_argument --device iphone-13-pro' \
-  -a 'sierra-blue\t"Sierra Blue"'
-
-complete -c screenflow -l color -r -d 'Frame color' \
-  -n '__fish_seen_argument --device iphone-14-pro' \
-  -a 'deep-purple\t"Deep Purple"'
-
-complete -c screenflow -l color -r -d 'Frame color' \
-  -n '__fish_seen_argument --device iphone-15-pro' \
-  -a 'titanium-nature\t"Desert Titanium"'
-
-complete -c screenflow -l color -r -d 'Frame color' \
-  -n '__fish_seen_argument --device iphone-16-pro' \
-  -a 'dessert-titanium\t"Desert Titanium" black\t"Black" natural\t"Natural" white\t"White"'
-
-complete -c screenflow -l color -r -d 'Frame color' \
-  -n '__fish_seen_argument --device iphone-air' \
-  -a 'black\t"Black" blue\t"Blue" gold\t"Gold" white\t"White"'
-
-complete -c screenflow -l color -r -d 'Frame color' \
-  -n '__fish_seen_argument --device imac' \
-  -a 'blue\t"Blue" green\t"Green" orange\t"Orange" pink\t"Pink" purple\t"Purple" silver\t"Silver" yellow\t"Yellow"'
+    complete -c screenflow -n "$__sf_cond" -l color -r \
+      -n 'not __fish_seen_argument -s d --device; or __fish_seen_argument --device iphone-17-pro' \
+      -a $__sf_colors_17pro
+    complete -c screenflow -n "$__sf_cond" -l color -r -n '__fish_seen_argument --device iphone-17'      -a $__sf_colors_17
+    complete -c screenflow -n "$__sf_cond" -l color -r -n '__fish_seen_argument --device iphone-16-pro'  -a $__sf_colors_16pro
+    complete -c screenflow -n "$__sf_cond" -l color -r -n '__fish_seen_argument --device iphone-16'      -a $__sf_colors_16
+    complete -c screenflow -n "$__sf_cond" -l color -r -n '__fish_seen_argument --device iphone-air'     -a $__sf_colors_air
+    complete -c screenflow -n "$__sf_cond" -l color -r -n '__fish_seen_argument --device ipad-pro-11'    -a $__sf_colors_11
+    complete -c screenflow -n "$__sf_cond" -l color -r -n '__fish_seen_argument --device ipad-pro-13'    -a $__sf_colors_13
+    complete -c screenflow -n "$__sf_cond" -l color -r -n '__fish_seen_argument --device imac'           -a $__sf_colors_imac
+end

@@ -1,90 +1,91 @@
 #compdef screenflow
 
 _screenflow() {
-  local device='iphone-17-pro'
+  local state line
+  typeset -A opt_args
 
-  # Detect which --device value has been typed so far
-  for ((i = 2; i < ${#words[@]}; i++)); do
-    if [[ ${words[$i]} == --device=* ]]; then
-      device=${words[$i]#--device=}
-      break
-    elif [[ ${words[$i]} == '--device' && -n ${words[$((i+1))]} ]]; then
-      device=${words[$((i+1))]}
-      break
-    fi
-  done
-
-  # Colors per device — add a new case block when a new device is added
-  local -a colors
-  case $device in
-    iphone-17-pro)
-      colors=('silver:Silver (default)' 'deep-blue:Deep Blue' 'cosmic-orange:Cosmic Orange')
-      ;;
-    ipad-pro-11)
-      colors=('silver:Silver' 'silver-with-apple-pencil:Silver with Apple Pencil' 'space-gray:Space Gray' 'space-gray-with-apple-pencil:Space Gray with Apple Pencil')
-      ;;
-    ipad-pro-13)
-      colors=('silver:Silver' 'space-gray:Space Gray')
-      ;;
-    iphone-13-pro)
-      colors=('sierra-blue:Sierra Blue')
-      ;;
-    iphone-14-pro)
-      colors=('deep-purple:Deep Purple')
-      ;;
-    iphone-15-pro)
-      colors=('titanium-nature:Desert Titanium')
-      ;;
-    iphone-16-pro)
-      colors=('dessert-titanium:Desert Titanium' 'black:Black' 'natural:Natural' 'white:White')
-      ;;
-    iphone-air)
-      colors=('black:Black' 'blue:Blue' 'gold:Gold' 'white:White')
-      ;;
-    iphone-17)
-      colors=('black:Black' 'lavender:Lavender' 'mist-blue:Mist Blue' 'sage:Sage' 'white:White')
-      ;;
-    iphone-16)
-      colors=('black:Black' 'pink:Pink' 'teal:Teal' 'ultramarine:Ultramarine' 'white:White')
-      ;;
-    imac)
-      colors=('blue:Blue' 'green:Green' 'orange:Orange' 'pink:Pink' 'purple:Purple' 'silver:Silver' 'yellow:Yellow')
-      ;;
-    *)
-      colors=('silver:Silver (default)')
-      ;;
-  esac
-
-  local -a devices
-  devices=(
-    'iphone-17-pro:iPhone 17 Pro (default)'
-    'ipad-pro-11:iPad Pro 11'
-    'ipad-pro-13:iPad Pro 13'
-    'iphone-13-pro:iPhone 13 Pro'
-    'iphone-14-pro:iPhone 14 Pro'
-    'iphone-15-pro:iPhone 15 Pro'
-    'iphone-16-pro:iPhone 16 Pro'
-  )
-
-  _arguments \
+  _arguments -C \
     '(-v --version)'{-v,--version}'[output the version number]' \
     '(-h --help)'{-h,--help}'[display help]' \
-    '--author[about the author]' \
+    '1: :->cmd_or_file' \
+    '*:: :->args'
+
+  case $state in
+    cmd_or_file)
+      local -a subcommands
+      subcommands=(
+        'video:Create a 4-second animated marketing video'
+        'devices:List all available devices and their colors'
+        'config:Show saved defaults'
+        'set-default:Set a default device and color interactively'
+        'author:About the author'
+      )
+      _alternative \
+        'subcommands:subcommand:_describe "command" subcommands' \
+        'files:screenshot:_files -g "*.png *.jpg *.jpeg"'
+      ;;
+    args)
+      case $line[1] in
+        video)       _screenflow_video ;;
+        devices|config|set-default|author) ;;
+        *)           _screenflow_frame ;;
+      esac
+      ;;
+  esac
+}
+
+_screenflow_colors() {
+  local device=${1:-iphone-17-pro}
+  local -a colors
+  case $device in
+    iphone-17-pro)  colors=(silver deep-blue cosmic-orange) ;;
+    iphone-17)      colors=(black lavender mist-blue sage white) ;;
+    iphone-16-pro)  colors=(dessert-titanium black natural white) ;;
+    iphone-16)      colors=(black pink teal ultramarine white) ;;
+    iphone-air)     colors=(black blue gold white) ;;
+    ipad-pro-11)    colors=(silver silver-with-apple-pencil space-gray space-gray-with-apple-pencil) ;;
+    ipad-pro-13)    colors=(silver space-gray) ;;
+    imac)           colors=(blue green orange pink purple silver yellow) ;;
+    *)              colors=(silver) ;;
+  esac
+  echo "${colors[@]}"
+}
+
+_screenflow_device_arg() {
+  local device='iphone-17-pro'
+  for ((i = 2; i < ${#words[@]}; i++)); do
+    if [[ ${words[$i]} == (-d=*|--device=*) ]]; then
+      device=${words[$i]#*=}; break
+    elif [[ (${words[$i]} == '-d' || ${words[$i]} == '--device') && -n ${words[$((i+1))]} ]]; then
+      device=${words[$((i+1))]}; break
+    fi
+  done
+  echo $device
+}
+
+_screenflow_frame() {
+  local device=$(_screenflow_device_arg)
+  local colors=($(_screenflow_colors $device))
+
+  _arguments \
     '(-o --output)'{-o+,--output=}'[output file path]:output file:_files' \
     '--png[output as PNG instead of SVG]' \
     '--jpeg[output as JPEG instead of SVG]' \
-    '--video[create a 5-second zoom-in video animation (requires ffmpeg)]' \
-    '--devices[list all devices and their available colors]' \
-    '--set-default[save --device and/or --color as your personal defaults]' \
-    '--show-config[show your saved defaults]' \
-    '--device=[device frame]:device:->devices' \
-    '--color=[frame color]:color:->colors' \
+    '(-d --device)'{-d+,--device=}'[device frame]:device:(iphone-17-pro iphone-17 iphone-16-pro iphone-16 iphone-air ipad-pro-11 ipad-pro-13 imac)' \
+    '(-c --color)'{-c+,--color=}'[frame color]:color:('"${colors[*]}"')' \
     ':screenshot:_files -g "*.png *.jpg *.jpeg"'
+}
 
-  case $state in
-    devices) _describe 'device' devices ;;
-    colors)  _describe 'color'  colors  ;;
-  esac
+_screenflow_video() {
+  local device=$(_screenflow_device_arg)
+  local colors=($(_screenflow_colors $device))
+
+  _arguments \
+    '(-o --output)'{-o+,--output=}'[output file path]:output file:_files' \
+    '(-d --device)'{-d+,--device=}'[device frame]:device:(iphone-17-pro iphone-17 iphone-16-pro iphone-16 iphone-air ipad-pro-11 ipad-pro-13 imac)' \
+    '(-c --color)'{-c+,--color=}'[frame color]:color:('"${colors[*]}"')' \
+    '(-s --style)'{-s+,--style=}'[animation style]:style:(zoom-in zoom-out pan-down pan-left pan-right)' \
+    ':screenshot:_files -g "*.png *.jpg *.jpeg"'
 }
 
 _screenflow "$@"

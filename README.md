@@ -21,21 +21,26 @@ screenflow screenshot.png
 # → screenshot_iphone-17-pro_silver.svg
 ```
 
-### Options
+### Commands
 
-| Option | Description |
+| Command | Description |
 |---|---|
-| `--device <device>` | Device frame (default: `iphone-17-pro`) |
-| `--color <color>` | Frame color (default: `silver`) |
-| `--png` | Output as PNG instead of SVG |
-| `--jpeg` | Output as JPEG instead of SVG |
-| `--video` | Create a 5-second marketing video animation (requires ffmpeg) |
-| `-o <path>` | Custom output file path |
-| `--devices` | List all devices and their available colors |
-| `--set-default` | Save a default device and color interactively |
-| `--show-config` | Show your saved defaults |
-| `-v` | Show version |
-| `--author` | About the author |
+| `screenflow <file>` | Frame a screenshot (default) |
+| `screenflow video <file>` | Create a 4-second animated marketing video |
+| `screenflow devices` | List all available devices and their colors |
+| `screenflow config` | Show your saved defaults |
+| `screenflow set-default` | Set a default device and color interactively |
+| `screenflow author` | About the author |
+
+### Frame options
+
+| Option | Short | Description |
+|---|---|---|
+| `--device <device>` | `-d` | Device frame (default: `iphone-17-pro`) |
+| `--color <color>` | `-c` | Frame color (default: `silver`) |
+| `--png` | | Output as PNG instead of SVG |
+| `--jpeg` | | Output as JPEG instead of SVG |
+| `--output <path>` | `-o` | Custom output file path |
 
 ### Examples
 
@@ -47,10 +52,10 @@ screenflow screenshot.png
 screenflow screenshot.png --color deep-blue
 
 # Cosmic Orange, exported as PNG
-screenflow screenshot.png --color cosmic-orange --png
+screenflow screenshot.png -c cosmic-orange --png
 
 # iPad Pro 11, Space Gray
-screenflow screenshot.png --device ipad-pro-11 --color space-gray --png
+screenflow screenshot.png -d ipad-pro-11 -c space-gray --png
 
 # Custom output path
 screenflow screenshot.png -o framed/app_store.svg
@@ -59,34 +64,51 @@ screenflow screenshot.png -o framed/app_store.svg
 screenflow screenshot.png --jpeg
 
 # Set a persistent default device and color
-screenflow --set-default
+screenflow set-default
 
 # List all available devices and colors
-screenflow --devices
+screenflow devices
 ```
 
 ### Video animation
 
-The `--video` flag renders a 5-second MP4 marketing clip with a 3D perspective tilt, a quick zoom-in, and a smooth upward pan. **Requires ffmpeg** — screenflow will offer to install it automatically via Homebrew if it's not present.
+`screenflow video <file>` renders a 4-second MP4 marketing clip with a 3D perspective tilt. **Requires ffmpeg** — screenflow will offer to install it automatically via Homebrew if it's not present.
+
+#### Video options
+
+| Option | Short | Description |
+|---|---|---|
+| `--style <style>` | `-s` | Animation style (default: `zoom-in`) |
+| `--device <device>` | `-d` | Device frame |
+| `--color <color>` | `-c` | Frame color |
+| `--output <path>` | `-o` | Custom output file path |
+
+#### Animation styles
+
+| Style | Description |
+|---|---|
+| `zoom-in` *(default)* | Zoom in 1× → 2.2×, smooth upward pan |
+| `zoom-out` | Zoom out 2.2× → 1×, centered |
+| `pan-down` | Constant 1.4× zoom, pan from top to bottom |
+| `pan-left` | Constant 1.4× zoom, pan from right to left |
+| `pan-right` | Constant 1.4× zoom, pan from left to right |
 
 ```bash
-# Render video next to the input file
-screenflow screenshot.png --video
+# Default zoom-in style
+screenflow video screenshot.png
 # → screenshot_iphone-17-pro_silver.mp4
 
-# With specific device and color
-screenflow screenshot.png --device iphone-16-pro --color dessert-titanium --video
+# Pan from top to bottom
+screenflow video screenshot.png --style pan-down
 
-# Custom output path
-screenflow screenshot.png --video -o ~/Desktop/promo.mp4
+# Zoom out with specific device and color
+screenflow video screenshot.png -d iphone-16-pro -c dessert-titanium --style zoom-out
+
+# Pan left with custom output
+screenflow video screenshot.png --style pan-left -o ~/Desktop/promo.mp4
 ```
 
-Animation sequence:
-1. **0 – 1.3 s** — full mockup visible on a 1920 × 1080 canvas
-2. **1.3 s** — zoom in to 2.2× toward the bottom of the device
-3. **1.3 – 5 s** — smooth upward pan with 3D perspective tilt (cosine ease-in-out, 60 fps)
-
-Output is always `1920 × 1080` H.264 MP4 at 60 fps, CRF 18.
+Output is always `1920 × 1080` H.264 MP4 at 60 fps, CRF 14, with a 3D perspective tilt.
 
 ### Supported Devices
 
