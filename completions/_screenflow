@@ -14,7 +14,7 @@ _screenflow() {
     cmd_or_file)
       local -a subcommands
       subcommands=(
-        'video:Create a 4-second animated marketing video'
+        'video:Create a 9-second animated marketing video'
         'devices:List all available devices and their colors'
         'config:Show saved defaults'
         'set-default:Set a default device and color interactively'
@@ -85,6 +85,8 @@ _screenflow_video() {
     '(-d --device)'{-d+,--device=}'[device frame]:device:(iphone-17-pro iphone-17 iphone-16-pro iphone-16 iphone-air ipad-pro-11 ipad-pro-13 imac)' \
     '(-c --color)'{-c+,--color=}'[frame color]:color:('"${colors[*]}"')' \
     '(-s --style)'{-s+,--style=}'[animation style]:style:(zoom-in zoom-out pan-down pan-left pan-right)' \
+    '(-t --tilt)'{-t+,--tilt=}'[perspective tilt in degrees (0–45)]:degrees:' \
+    '--fps=[frame rate]:fps:(24 30 60 120)' \
     ':screenshot:_files -g "*.png *.jpg *.jpeg"'
 }
 

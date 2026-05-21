@@ -48,11 +48,13 @@ function buildProgram(): Command {
 
   program
     .command('video <file>')
-    .description('Create a 4-second animated marketing video (requires ffmpeg)')
+    .description('Create a 9-second animated marketing video (requires ffmpeg)')
     .option('-o, --output <path>', 'Output file path')
     .option('-d, --device <device>', 'Device frame (e.g. iphone-17-pro)')
     .option('-c, --color <color>', 'Frame color for the chosen device')
     .option('-s, --style <style>', `Animation style: ${VALID_STYLES.join(' | ')}`, 'zoom-in')
+    .option('-t, --tilt <degrees>', 'Perspective tilt downward in degrees (0–45)', '0')
+    .option('--fps <fps>', 'Frame rate: 24, 30, 60, or 120', '60')
     .action(async (file: string, options) => {
       if (!VALID_STYLES.includes(options.style)) {
         console.error(`\nError: Unknown style "${options.style}". Choose from: ${VALID_STYLES.join(', ')}\n`);

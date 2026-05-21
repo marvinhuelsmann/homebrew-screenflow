@@ -26,7 +26,7 @@ screenflow screenshot.png
 | Command | Description |
 |---|---|
 | `screenflow <file>` | Frame a screenshot (default) |
-| `screenflow video <file>` | Create a 4-second animated marketing video |
+| `screenflow video <file>` | Create a 9-second animated marketing video |
 | `screenflow devices` | List all available devices and their colors |
 | `screenflow config` | Show your saved defaults |
 | `screenflow set-default` | Set a default device and color interactively |
@@ -72,13 +72,15 @@ screenflow devices
 
 ### Video animation
 
-`screenflow video <file>` renders a 4-second MP4 marketing clip with a 3D perspective tilt. **Requires ffmpeg** — screenflow will offer to install it automatically via Homebrew if it's not present.
+`screenflow video <file>` renders a 9-second MP4 marketing clip. **Requires ffmpeg** — screenflow will offer to install it automatically via Homebrew if it's not present.
 
 #### Video options
 
 | Option | Short | Description |
 |---|---|---|
 | `--style <style>` | `-s` | Animation style (default: `zoom-in`) |
+| `--tilt <degrees>` | `-t` | Perspective tilt downward in degrees, 0–45 (default: `0`) |
+| `--fps <fps>` | | Frame rate: 24, 30, 60, or 120 (default: `60`) |
 | `--device <device>` | `-d` | Device frame |
 | `--color <color>` | `-c` | Frame color |
 | `--output <path>` | `-o` | Custom output file path |
@@ -106,9 +108,15 @@ screenflow video screenshot.png -d iphone-16-pro -c dessert-titanium --style zoo
 
 # Pan left with custom output
 screenflow video screenshot.png --style pan-left -o ~/Desktop/promo.mp4
+
+# Zoom-in with 15° downward tilt
+screenflow video screenshot.png --tilt 15
+
+# Zoom-in at 120 fps
+screenflow video screenshot.png --fps 120
 ```
 
-Output is always `1920 × 1080` H.264 MP4 at 60 fps, CRF 14, with a 3D perspective tilt.
+Output is always `1920 × 1080` H.264 MP4 at 60 fps, CRF 14.
 
 ### Supported Devices
 

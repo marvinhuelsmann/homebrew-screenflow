@@ -12,7 +12,7 @@ complete -c screenflow -s v -l version -d 'Output the version number'
 complete -c screenflow -s h -l help    -d 'Display help'
 
 # Subcommands (only when no subcommand has been given yet)
-complete -c screenflow -n '__fish_screenflow_no_subcommand' -f -a 'video'       -d 'Create a 4-second animated marketing video'
+complete -c screenflow -n '__fish_screenflow_no_subcommand' -f -a 'video'       -d 'Create a 9-second animated marketing video'
 complete -c screenflow -n '__fish_screenflow_no_subcommand' -f -a 'devices'     -d 'List all available devices and their colors'
 complete -c screenflow -n '__fish_screenflow_no_subcommand' -f -a 'config'      -d 'Show saved defaults'
 complete -c screenflow -n '__fish_screenflow_no_subcommand' -f -a 'set-default' -d 'Set a default device and color interactively'
@@ -31,6 +31,8 @@ complete -c screenflow -n '__fish_seen_subcommand_from video' -s d -l device -r 
 complete -c screenflow -n '__fish_seen_subcommand_from video' -s c -l color  -r -d 'Frame color'
 complete -c screenflow -n '__fish_seen_subcommand_from video' -s s -l style  -r -d 'Animation style' \
   -a 'zoom-in\t"Zoom in 1× → 2.2×, pan upward (default)" zoom-out\t"Zoom out 2.2× → 1×" pan-down\t"Pan top → bottom" pan-left\t"Pan right → left" pan-right\t"Pan left → right"'
+complete -c screenflow -n '__fish_seen_subcommand_from video' -s t -l tilt   -r -d 'Perspective tilt downward in degrees (0–45)'
+complete -c screenflow -n '__fish_seen_subcommand_from video'      -l fps    -r -d 'Frame rate' -a '24\t"24 fps" 30\t"30 fps" 60\t"60 fps (default)" 120\t"120 fps"'
 
 # Devices
 set -l __screenflow_devices 'iphone-17-pro\t"iPhone 17 Pro (default)" iphone-17\t"iPhone 17" iphone-16-pro\t"iPhone 16 Pro" iphone-16\t"iPhone 16" iphone-air\t"iPhone Air" ipad-pro-11\t"iPad Pro 11" ipad-pro-13\t"iPad Pro 13" imac\t"iMac"'
