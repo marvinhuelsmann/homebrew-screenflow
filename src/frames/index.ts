@@ -4,6 +4,7 @@ export interface FrameSpec {
   colors: Record<string, string>; // color name → svg filename within device folder
   frameType?: 'vector' | 'raster' | 'overlay'; // default: 'vector'
   cornerRadius?: number; // clips screenshot corners to match the frame's rounded screen edge
+  cutoutBleed?: number; // expands vector screen cutout covers to hide native screenshot hardware UI
 }
 
 export const FRAMES: Record<string, FrameSpec> = {
@@ -15,6 +16,7 @@ export const FRAMES: Record<string, FrameSpec> = {
       'deep-blue':      'deep-blue.svg',
       'cosmic-orange':  'cosmic-orange.svg',
     },
+    cutoutBleed: 8,
   },
   'ipad-pro-11': {
     canvas: { w: 2788, h: 2068 },
@@ -98,6 +100,18 @@ export const FRAMES: Record<string, FrameSpec> = {
       'purple': 'purple.svg',
       'silver': 'silver.svg',
       'yellow': 'yellow.svg',
+    },
+  },
+  'apple-watch-ultra': {
+    canvas: { w: 600, h: 960 },
+    screen: { x: 89, y: 223, w: 422, h: 514 },
+    frameType: 'raster',
+    cornerRadius: 115,
+    colors: {
+      'black-alpine-loop': 'black-alpine-loop.svg',
+      'black-milanese': 'black-milanese.svg',
+      'natural-alpine-loop': 'natural-alpine-loop.svg',
+      'natural-milanese': 'natural-milanese.svg',
     },
   },
 };

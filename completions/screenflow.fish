@@ -12,7 +12,7 @@ complete -c screenflow -s v -l version -d 'Output the version number'
 complete -c screenflow -s h -l help    -d 'Display help'
 
 # Subcommands (only when no subcommand has been given yet)
-complete -c screenflow -n '__fish_screenflow_no_subcommand' -f -a 'video'       -d 'Create a 9-second animated marketing video'
+complete -c screenflow -n '__fish_screenflow_no_subcommand' -f -a 'video'       -d 'Create a 9-second animated marketing video apple-watch-ultra\t"Apple Watch Ultra"'
 complete -c screenflow -n '__fish_screenflow_no_subcommand' -f -a 'devices'     -d 'List all available devices and their colors'
 complete -c screenflow -n '__fish_screenflow_no_subcommand' -f -a 'config'      -d 'Show saved defaults'
 complete -c screenflow -n '__fish_screenflow_no_subcommand' -f -a 'set-default' -d 'Set a default device and color interactively'
@@ -64,3 +64,7 @@ for __sf_sub in '' video
     complete -c screenflow -n "$__sf_cond" -l color -r -n '__fish_seen_argument --device ipad-pro-13'    -a $__sf_colors_13
     complete -c screenflow -n "$__sf_cond" -l color -r -n '__fish_seen_argument --device imac'           -a $__sf_colors_imac
 end
+
+complete -c screenflow -l color -r -d 'Frame color' \
+  -n '__fish_seen_argument --device apple-watch-ultra' \
+  -a 'black-alpine-loop\t"Black Alpine Loop" black-milanese\t"Black Milanese" natural-alpine-loop\t"Natural Alpine Loop" natural-milanese\t"Natural Milanese"'

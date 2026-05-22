@@ -134,6 +134,7 @@ Output is always `1920 × 1080` H.264 MP4, CRF 12.
 | iPhone 17" | `iphone-17` | `black`, `lavender`, `mist-blue`, `sage`, `white` |
 | iPhone 16" | `iphone-16` | `black`, `pink`, `teal`, `ultramarine`, `white` |
 | Imac | `imac` | `blue`, `green`, `orange`, `pink`, `purple`, `silver`, `yellow` |
+| Apple Watch Ultra | `apple-watch-ultra` | `black-alpine-loop`, `black-milanese`, `natural-alpine-loop`, `natural-milanese` |
 
 ## Updating
 

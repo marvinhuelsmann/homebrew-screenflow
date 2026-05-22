@@ -22,41 +22,84 @@ function resolveColor(device: string, input: string): string {
 
 // ── Vector compositing (iPhone-style: pure SVG with Screen mask clip path) ───
 
-function extractPhoneBodyPath(svgContent: string): string {
+function extractScreenMaskPaths(svgContent: string): { phoneBody: string; cutouts: string[] } {
   const match = svgContent.match(/<path[^>]+id="Screen mask"[^>]+d="([^"]+)"/);
   if (!match) throw new Error('Could not find Screen mask path in SVG frame');
-  const parts = match[1].split('Z');
+  // parts[0] = outer canvas rect, parts[1] = phone body, parts[2+] = cutouts (Dynamic Island etc.)
+  const parts = match[1].split('Z').filter(p => p.trim()).map(p => p.trim() + 'Z');
   if (parts.length < 2) throw new Error('Unexpected Screen mask path format');
-  return parts[1].trim() + 'Z';
+  return { phoneBody: parts[1], cutouts: parts.slice(2) };
 }
 
 function buildVectorSvg(
   frameSvg: string,
   screenshotB64: string,
   screen: { x: number; y: number; w: number; h: number },
+  cutoutBleed = 0,
 ): string {
-  const phoneBodyPath = extractPhoneBodyPath(frameSvg);
+  const { phoneBody, cutouts } = extractScreenMaskPaths(frameSvg);
+  const cutoutStrokeWidth = cutoutBleed * 2;
   const defs = [
     `<defs>`,
-    `<clipPath id="sf-screen-clip"><path d="${phoneBodyPath}"/></clipPath>`,
+    `<clipPath id="sf-screen-clip"><path d="${phoneBody}"/></clipPath>`,
     `</defs>`,
   ].join('');
-  const image = `<image clip-path="url(#sf-screen-clip)" x="${screen.x}" y="${screen.y}" width="${screen.w}" height="${screen.h}" href="data:image/png;base64,${screenshotB64}"/>`;
+  const image = [
+    `<image clip-path="url(#sf-screen-clip)"`,
+    `x="${screen.x}" y="${screen.y}" width="${screen.w}" height="${screen.h}"`,
+    `href="data:image/png;base64,${screenshotB64}"/>`,
+  ].join(' ');
+  const cutoutCovers = cutouts
+    .map(p => [
+      `<path d="${p}" fill="black" stroke="black"`,
+      `stroke-width="${cutoutStrokeWidth}" stroke-linejoin="round" stroke-linecap="round"/>`,
+    ].join(' '))
+    .join('');
   return frameSvg
     .replace('<svg ', '<svg xmlns:xlink="http://www.w3.org/1999/xlink" ')
-    .replace('<g id="Phone">', `<g id="Phone">${defs}${image}`);
+    .replace('<g id="Phone">', `<g id="Phone">${defs}${image}${cutoutCovers}`);
 }
 
 async function composeVector(
   inputPath: string, spec: FrameSpec, frameSvg: string,
   outputPath: string, format: Format,
 ): Promise<void> {
-  const screenshot = await sharp(inputPath)
+  let screenshot = await sharp(inputPath)
     .resize(spec.screen.w, spec.screen.h, { fit: 'cover', position: 'top' })
     .png()
     .toBuffer();
 
-  const compositeSvg = buildVectorSvg(frameSvg, screenshot.toString('base64'), spec.screen);
+  // Punch out Dynamic Island (and any other screen cutouts) from the screenshot buffer
+  // before embedding. A black cover is also drawn in the SVG to hide slight native
+  // screenshot/asset geometry mismatches without leaving transparent halos.
+  const { cutouts } = extractScreenMaskPaths(frameSvg);
+  if (cutouts.length > 0) {
+    const ox = spec.screen.x;
+    const oy = spec.screen.y;
+    const cutoutBleed = spec.cutoutBleed ?? 0;
+    const cutoutStrokeWidth = cutoutBleed * 2;
+    const punchSvg = [
+      `<svg width="${spec.screen.w}" height="${spec.screen.h}" xmlns="http://www.w3.org/2000/svg">`,
+      ...cutouts.map(p => [
+        `<path d="${p}" transform="translate(${-ox},${-oy})"`,
+        `fill="white" stroke="white" stroke-width="${cutoutStrokeWidth}"`,
+        `stroke-linejoin="round" stroke-linecap="round"/>`,
+      ].join(' ')),
+      `</svg>`,
+    ].join('');
+    const punchMask = await sharp(Buffer.from(punchSvg)).png().toBuffer();
+    screenshot = await sharp(screenshot)
+      .composite([{ input: punchMask, blend: 'dest-out' }])
+      .png()
+      .toBuffer();
+  }
+
+  const compositeSvg = buildVectorSvg(
+    frameSvg,
+    screenshot.toString('base64'),
+    spec.screen,
+    spec.cutoutBleed,
+  );
 
   if (format === 'svg') {
     fs.writeFileSync(outputPath, compositeSvg, 'utf8');
