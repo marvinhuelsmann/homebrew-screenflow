@@ -165,8 +165,9 @@ function buildAnimFilter(style: VideoStyle, dur: number): string[] {
 
   // Pan-left / pan-right: full device visible (zoomed out), slides across.
   // Scale canvas to output size → pad to 3× width → crop window slides across.
-  // Device is centered in the 5760-wide canvas (x=1920..3840); xSlide=3840 range.
-  const xExpr = style === 'pan-left' ? `3840*(1-${e})` : `3840*${e}`;
+  // Device centered at x=1920..3840 in the 5760 canvas. Slide ±960 from center
+  // (x: 960↔2880) so device is half-visible at extremes, fully visible at midpoint.
+  const xExpr = style === 'pan-left' ? `960+1920*(1-${e})` : `960+1920*${e}`;
   return [
     `scale=1920:1080:flags=lanczos`,
     `pad=5760:1080:1920:0:black`,
