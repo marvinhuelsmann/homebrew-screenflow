@@ -17,12 +17,27 @@ export async function run(): Promise<void> {
     return;
   }
 
-  await program.parseAsync(process.argv);
+  await program.parseAsync(normalizeArgv(process.argv));
+}
+
+function normalizeArgv(argv: string[]): string[] {
+  const singleDashLongOptions = new Set([
+    '-output',
+    '-device',
+    '-color',
+    '-style',
+    '-tilt',
+    '-fps',
+    '-duration',
+  ]);
+
+  return argv.map(arg => singleDashLongOptions.has(arg) ? `-${arg}` : arg);
 }
 
 function buildProgram(): Command {
   const program = new Command()
     .name('screenflow')
+    .enablePositionalOptions()
     .description('Wrap simulator screenshots in a device frame — pixel-perfect, no clock, no Dynamic Island')
     .version(version, '-v, --version')
     .helpOption('-h, --help', 'Show help')

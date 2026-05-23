@@ -1,5 +1,5 @@
 import { Config } from '../config';
-import { FRAMES, DEFAULT_DEVICE } from '../frames';
+import { FRAMES, DEFAULT_DEVICE, getDefaultColor } from '../frames';
 
 export function devicesAction(): void {
   const config = new Config();
@@ -7,7 +7,10 @@ export function devicesAction(): void {
 
   console.log('');
   for (const [id, spec] of Object.entries(FRAMES).sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))) {
-    const colors = Object.keys(spec.colors).join(', ');
+    const defaultColor = getDefaultColor(id);
+    const colors = Object.keys(spec.colors)
+      .map(color => color === defaultColor ? `${color} (default)` : color)
+      .join(', ');
     const isDefault = id === defaultDevice;
     console.log(`  ${id}${isDefault ? ' (default)' : ''}`);
     console.log(`    Colors: ${colors}`);

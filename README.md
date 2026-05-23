@@ -18,7 +18,7 @@ Output defaults to SVG and is placed next to your input file.
 
 ```bash
 screenflow screenshot.png
-# → screenshot_iphone-17-pro_silver.svg
+# → screenshot_iphone-17-pro_cosmic-orange.svg
 ```
 
 ### Commands
@@ -37,7 +37,7 @@ screenflow screenshot.png
 | Option | Short | Description |
 |---|---|---|
 | `--device <device>` | `-d` | Device frame (default: `iphone-17-pro`) |
-| `--color <color>` | `-c` | Frame color (default: `silver`) |
+| `--color <color>` | `-c` | Frame color (default: first color for the chosen device) |
 | `--png` | | Output as PNG instead of SVG |
 | `--jpeg` | | Output as JPEG instead of SVG |
 | `--output <path>` | `-o` | Custom output file path |
@@ -45,7 +45,7 @@ screenflow screenshot.png
 ### Examples
 
 ```bash
-# Default — iPhone 17 Pro, Silver frame, SVG output
+# Default — iPhone 17 Pro, Cosmic Orange frame, SVG output
 screenflow screenshot.png
 
 # Deep Blue frame
@@ -99,7 +99,7 @@ screenflow devices
 ```bash
 # Default zoom-in style (9 seconds)
 screenflow video screenshot.png
-# → screenshot_iphone-17-pro_silver.mp4
+# → screenshot_iphone-17-pro_cosmic-orange.mp4
 
 # 15-second video
 screenflow video screenshot.png --duration 15
@@ -126,7 +126,7 @@ Output is always `1920 × 1080` H.264 MP4, CRF 12.
 
 | Device | ID | Colors |
 |---|---|---|
-| iPhone 17 Pro | `iphone-17-pro` | `silver`, `deep-blue`, `cosmic-orange` |
+| iPhone 17 Pro | `iphone-17-pro` | `cosmic-orange`, `deep-blue`, `silver` |
 | iPhone 16 Pro | `iphone-16-pro` | `dessert-titanium`, `black`, `natural`, `white` |
 | iPad Pro 11" | `ipad-pro-11` | `silver`, `silver-with-apple-pencil`, `space-gray`, `space-gray-with-apple-pencil` |
 | iPad Pro 13" | `ipad-pro-13` | `silver`, `space-gray` |
@@ -135,6 +135,7 @@ Output is always `1920 × 1080` H.264 MP4, CRF 12.
 | iPhone 16" | `iphone-16` | `black`, `pink`, `teal`, `ultramarine`, `white` |
 | Imac | `imac` | `blue`, `green`, `orange`, `pink`, `purple`, `silver`, `yellow` |
 | Apple Watch Ultra | `apple-watch-ultra` | `black-alpine-loop`, `black-milanese`, `natural-alpine-loop`, `natural-milanese` |
+| Apple Watch Series 11" | `apple-watch-series-11` | `titanium-gold-magnetic-link-sage-gray`, `titanium-gold-milanese-loop`, `titanium-natural-magnetic-link-caramel`, `titanium-natural-sport-band-stone-gray`, `titanium-slate-magnetic-link-navy`, `titanium-slate-milanese-loop` |
 
 ## Updating
 
@@ -155,9 +156,9 @@ src/
   frames/
     index.ts        ← FRAMES registry — source of truth for devices, colors, dimensions
     iphone-17-pro/  ← SVG frame files per color
-      silver.svg
-      deep-blue.svg
       cosmic-orange.svg
+      deep-blue.svg
+      silver.svg
     ipad-pro-11/
     ipad-pro-13/
     iphone-16-pro/
@@ -237,6 +238,8 @@ The script automatically:
 npm run build
 node dist/index.js screenshot.png --device your-new-device --color silver
 ```
+
+The first color registered for a device is used as that device's automatic default.
 
 > **Vector frames** (like the iPhone 17 Pro SVGs) have a `<path id="Screen mask">` element. The script registers them but cannot auto-detect screen coordinates from vector paths — check the logged output and correct the values in `src/frames/index.ts` manually if needed.
 

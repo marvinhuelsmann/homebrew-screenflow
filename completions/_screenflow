@@ -38,7 +38,7 @@ _screenflow_colors() {
   local device=${1:-iphone-17-pro}
   local -a colors
   case $device in
-    iphone-17-pro)  colors=(silver deep-blue cosmic-orange) ;;
+    iphone-17-pro)  colors=(cosmic-orange deep-blue silver) ;;
     iphone-17)      colors=(black lavender mist-blue sage white) ;;
     iphone-16-pro)  colors=(dessert-titanium black natural white) ;;
     iphone-16)      colors=(black pink teal ultramarine white) ;;
@@ -46,7 +46,7 @@ _screenflow_colors() {
     ipad-pro-11)    colors=(silver silver-with-apple-pencil space-gray space-gray-with-apple-pencil) ;;
     ipad-pro-13)    colors=(silver space-gray) ;;
     imac)           colors=(blue green orange pink purple silver yellow) ;;
-    *)              colors=(silver) ;;
+    *)              colors=(cosmic-orange) ;;
   esac
   echo "${colors[@]}"
 }

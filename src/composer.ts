@@ -1,7 +1,7 @@
 import sharp from 'sharp';
 import * as fs from 'fs';
 import * as path from 'path';
-import { FRAMES, DEFAULT_DEVICE, FrameSpec } from './frames';
+import { FRAMES, FrameSpec, getDefaultColor } from './frames';
 
 export type Format = 'svg' | 'png' | 'jpeg';
 
@@ -230,7 +230,7 @@ export async function compose(
   deviceInput: string,
   outputPath: string,
   format: Format = 'svg',
-  colorInput = 'silver',
+  colorInput = getDefaultColor(deviceInput),
 ): Promise<void> {
   const device = resolveDevice(deviceInput);
   const color = resolveColor(device, colorInput);

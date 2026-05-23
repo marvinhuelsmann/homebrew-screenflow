@@ -1,7 +1,7 @@
 import path from 'path';
 import { compose } from '../composer';
 import { Config } from '../config';
-import { DEFAULT_DEVICE } from '../frames';
+import { DEFAULT_DEVICE, getDefaultColor, hasFrameColor } from '../frames';
 
 interface FrameOptions {
   output?: string;
@@ -60,7 +60,10 @@ class Spinner {
 export async function frameAction(file: string, options: FrameOptions): Promise<void> {
   const config = new Config();
   const device = options.device ?? config.device ?? DEFAULT_DEVICE;
-  const color  = options.color  ?? config.color  ?? 'silver';
+  const color = options.color
+    ?? (!options.device && config.color && hasFrameColor(device, config.color)
+      ? config.color
+      : getDefaultColor(device));
 
   const inputPath = path.resolve(file);
   const base = path.basename(inputPath, path.extname(inputPath));

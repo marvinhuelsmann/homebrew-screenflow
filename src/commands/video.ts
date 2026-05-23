@@ -6,7 +6,7 @@ import { confirm } from '@inquirer/prompts';
 import sharp from 'sharp';
 import { compose } from '../composer';
 import { Config } from '../config';
-import { DEFAULT_DEVICE } from '../frames';
+import { DEFAULT_DEVICE, getDefaultColor, hasFrameColor } from '../frames';
 
 export type VideoStyle = 'zoom-in' | 'zoom-out' | 'pan-down' | 'pan-left' | 'pan-right';
 
@@ -180,7 +180,10 @@ export async function videoAction(file: string, options: VideoOptions): Promise<
 
   const config = new Config();
   const device = options.device ?? config.device ?? DEFAULT_DEVICE;
-  const color  = options.color  ?? config.color  ?? 'silver';
+  const color = options.color
+    ?? (!options.device && config.color && hasFrameColor(device, config.color)
+      ? config.color
+      : getDefaultColor(device));
   const style  = (options.style ?? 'zoom-in') as VideoStyle;
   const tilt   = parseFloat(options.tilt ?? '0');
   if (isNaN(tilt) || tilt < 0 || tilt > 45) {
@@ -204,8 +207,8 @@ export async function videoAction(file: string, options: VideoOptions): Promise<
     ? path.resolve(options.output)
     : path.join(dir, `${base}_${device}_${color}.mp4`);
 
-  const ts     = Date.now();
-  const tmpPng = path.join(os.tmpdir(), `screenflow_${ts}.png`);
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'screenflow-'));
+  const tmpPng = path.join(tmpDir, 'frame.png');
 
   const composeLabel = `Compositing ${bold(fmtName(device))}${dot()}${bold(fmtName(color))}`;
   const s1 = new Spinner(`${composeLabel}...`);
@@ -266,7 +269,7 @@ export async function videoAction(file: string, options: VideoOptions): Promise<
     outputPath,
   ]);
 
-  fs.unlinkSync(tmpPng);
+  fs.rmSync(tmpDir, { recursive: true, force: true });
   s2.stop(`${cyan('✦')} ${encodeLabel}`);
 
   if (exitCode !== 0) throw new Error(`ffmpeg failed:\n${stderr}`);

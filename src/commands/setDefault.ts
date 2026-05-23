@@ -1,6 +1,6 @@
 import { select } from '@inquirer/prompts';
 import { Config } from '../config';
-import { FRAMES, DEFAULT_DEVICE } from '../frames';
+import { FRAMES, DEFAULT_DEVICE, getDefaultColor, getFrameColors, hasFrameColor } from '../frames';
 
 export async function setDefaultAction(): Promise<void> {
   const config = new Config();
@@ -16,8 +16,10 @@ export async function setDefaultAction(): Promise<void> {
 
   const color = await select({
     message: 'Default color:',
-    choices: Object.keys(FRAMES[device].colors).map(c => ({ value: c })),
-    default: config.color ?? 'silver',
+    choices: getFrameColors(device).map(c => ({ value: c })),
+    default: config.device === device && config.color && hasFrameColor(device, config.color)
+      ? config.color
+      : getDefaultColor(device),
   });
 
   config.save({ device, color });

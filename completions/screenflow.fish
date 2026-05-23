@@ -12,7 +12,7 @@ complete -c screenflow -s v -l version -d 'Output the version number'
 complete -c screenflow -s h -l help    -d 'Display help'
 
 # Subcommands (only when no subcommand has been given yet)
-complete -c screenflow -n '__fish_screenflow_no_subcommand' -f -a 'video'       -d 'Create a 9-second animated marketing video apple-watch-ultra\t"Apple Watch Ultra"'
+complete -c screenflow -n '__fish_screenflow_no_subcommand' -f -a 'video'       -d 'Create a 9-second animated marketing video apple-watch-ultra\t"Apple Watch Ultra" apple-watch-series-11\t"Apple Watch Series 11""'
 complete -c screenflow -n '__fish_screenflow_no_subcommand' -f -a 'devices'     -d 'List all available devices and their colors'
 complete -c screenflow -n '__fish_screenflow_no_subcommand' -f -a 'config'      -d 'Show saved defaults'
 complete -c screenflow -n '__fish_screenflow_no_subcommand' -f -a 'set-default' -d 'Set a default device and color interactively'
@@ -41,7 +41,7 @@ complete -c screenflow -n '__fish_screenflow_no_subcommand'    -l device -r -a $
 complete -c screenflow -n '__fish_seen_subcommand_from video'  -l device -r -a $__screenflow_devices
 
 # Colors — scoped per device
-set -l __sf_colors_17pro  'silver\t"Silver (default)" deep-blue\t"Deep Blue" cosmic-orange\t"Cosmic Orange"'
+set -l __sf_colors_17pro  'cosmic-orange\t"Cosmic Orange (default)" deep-blue\t"Deep Blue" silver\t"Silver"'
 set -l __sf_colors_17     'black\t"Black" lavender\t"Lavender" mist-blue\t"Mist Blue" sage\t"Sage" white\t"White"'
 set -l __sf_colors_16pro  'dessert-titanium\t"Desert Titanium" black\t"Black" natural\t"Natural" white\t"White"'
 set -l __sf_colors_16     'black\t"Black" pink\t"Pink" teal\t"Teal" ultramarine\t"Ultramarine" white\t"White"'
@@ -68,3 +68,7 @@ end
 complete -c screenflow -l color -r -d 'Frame color' \
   -n '__fish_seen_argument --device apple-watch-ultra' \
   -a 'black-alpine-loop\t"Black Alpine Loop" black-milanese\t"Black Milanese" natural-alpine-loop\t"Natural Alpine Loop" natural-milanese\t"Natural Milanese"'
+
+complete -c screenflow -l color -r -d 'Frame color' \
+  -n '__fish_seen_argument --device apple-watch-series-11' \
+  -a 'titanium-gold-magnetic-link-sage-gray\t"Titanium Gold Magnetic Link Sage Gray" titanium-gold-milanese-loop\t"Titanium Gold Milanese Loop" titanium-natural-magnetic-link-caramel\t"Titanium Natural Magnetic Link Caramel" titanium-natural-sport-band-stone-gray\t"Titanium Natural Sport Band Stone Gray" titanium-slate-magnetic-link-navy\t"Titanium Slate Magnetic Link Navy" titanium-slate-milanese-loop\t"Titanium Slate Milanese Loop"'

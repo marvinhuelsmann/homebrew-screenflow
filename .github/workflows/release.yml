@@ -1,9 +1,14 @@
 name: Release
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - master
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -22,14 +27,20 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Verify package contents
+        run: npm pack --dry-run
+
   release:
     needs: build
     runs-on: ubuntu-latest
+    if: github.actor != 'github-actions[bot]'
     permissions:
       contents: write
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Read version from package.json
         id: version
@@ -45,6 +56,14 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Find previous release tag
+        if: steps.tag_check.outputs.exists == 'false'
+        id: previous_tag
+        run: |
+          TAG="${{ steps.version.outputs.value }}"
+          PREVIOUS_TAG=$(git tag --sort=-version:refname | grep -v "^${TAG}$" | head -n 1 || true)
+          echo "value=$PREVIOUS_TAG" >> "$GITHUB_OUTPUT"
+
       - name: Create tag
         if: steps.tag_check.outputs.exists == 'false'
         env:
@@ -59,10 +78,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${{ steps.version.outputs.value }}" \
-            --title "${{ steps.version.outputs.value }}" \
-            --generate-notes \
+          ARGS=(
+            "${{ steps.version.outputs.value }}"
+            --title "${{ steps.version.outputs.value }}"
+            --generate-notes
             --repo "${{ github.repository }}"
+          )
+
+          if [ -n "${{ steps.previous_tag.outputs.value }}" ]; then
+            ARGS+=(--notes-start-tag "${{ steps.previous_tag.outputs.value }}")
+          fi
+
+          gh release create "${ARGS[@]}"
 
       - name: Compute formula SHA256
         if: steps.tag_check.outputs.exists == 'false'
@@ -86,5 +113,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Formula/screenflow.rb
+          if git diff --cached --quiet; then
+            echo "Formula is already up to date"
+            exit 0
+          fi
           git commit -m "chore: update formula to ${{ steps.version.outputs.value }}"
           git push origin HEAD:master

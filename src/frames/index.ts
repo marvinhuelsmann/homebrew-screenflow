@@ -12,9 +12,9 @@ export const FRAMES: Record<string, FrameSpec> = {
     canvas: { w: 880, h: 1832 },
     screen: { x: 38, y: 42, w: 804, h: 1748 },
     colors: {
-      'silver':         'silver.svg',
-      'deep-blue':      'deep-blue.svg',
       'cosmic-orange':  'cosmic-orange.svg',
+      'deep-blue':      'deep-blue.svg',
+      'silver':         'silver.svg',
     },
     cutoutBleed: 8,
   },
@@ -114,6 +114,36 @@ export const FRAMES: Record<string, FrameSpec> = {
       'natural-milanese': 'natural-milanese.svg',
     },
   },
+  'apple-watch-series-11': {
+    canvas: { w: 560, h: 880 },
+    screen: { x: 72, y: 192, w: 416, h: 496 },
+    frameType: 'raster',
+    cornerRadius: 103,
+    colors: {
+      'titanium-gold-magnetic-link-sage-gray': 'titanium-gold-magnetic-link-sage-gray.svg',
+      'titanium-gold-milanese-loop': 'titanium-gold-milanese-loop.svg',
+      'titanium-natural-magnetic-link-caramel': 'titanium-natural-magnetic-link-caramel.svg',
+      'titanium-natural-sport-band-stone-gray': 'titanium-natural-sport-band-stone-gray.svg',
+      'titanium-slate-magnetic-link-navy': 'titanium-slate-magnetic-link-navy.svg',
+      'titanium-slate-milanese-loop': 'titanium-slate-milanese-loop.svg',
+    },
+  },
 };
 
 export const DEFAULT_DEVICE = 'iphone-17-pro';
+
+export function getFrameColors(device: string): string[] {
+  const spec = FRAMES[device];
+  if (!spec) throw new Error(`Unknown device "${device}"`);
+  return Object.keys(spec.colors);
+}
+
+export function getDefaultColor(device: string): string {
+  const [color] = getFrameColors(device);
+  if (!color) throw new Error(`No colors registered for "${device}"`);
+  return color;
+}
+
+export function hasFrameColor(device: string, color: string): boolean {
+  return getFrameColors(device).includes(color);
+}
