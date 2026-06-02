@@ -257,14 +257,27 @@ export async function buildFrameAssets(
     : await sharp(Buffer.from(frameSvg)).png().toBuffer();
 
   const r = spec.cornerRadius ?? 0;
-  const cornerMaskPng = r > 0
-    ? await sharp(Buffer.from(
-        `<svg xmlns="http://www.w3.org/2000/svg" width="${spec.screen.w}" height="${spec.screen.h}">` +
-        `<rect width="${spec.screen.w}" height="${spec.screen.h}" fill="black"/>` +
-        `<rect width="${spec.screen.w}" height="${spec.screen.h}" rx="${r}" fill="white"/>` +
-        `</svg>`,
-      )).png().toBuffer()
-    : null;
+  let cornerMaskPng: Buffer | null = null;
+  if (r > 0) {
+    cornerMaskPng = await sharp(Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${spec.screen.w}" height="${spec.screen.h}">` +
+      `<rect width="${spec.screen.w}" height="${spec.screen.h}" fill="black"/>` +
+      `<rect width="${spec.screen.w}" height="${spec.screen.h}" rx="${r}" fill="white"/>` +
+      `</svg>`,
+    )).png().toBuffer();
+  } else if (!spec.frameType || spec.frameType === 'vector') {
+    // Vector frames rely on the SVG clip path for stills, but the video pipeline
+    // composites a rasterised overlay PNG — which has transparent corner zones
+    // outside the rounded phone body where the bezel elements don't reach.
+    // Build a luma mask from the actual phone body path so alphamerge can clip
+    // the recording to the correct rounded shape.
+    const { phoneBody } = extractScreenMaskPaths(frameSvg);
+    const maskSvg =
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${spec.screen.w}" height="${spec.screen.h}">` +
+      `<path d="${phoneBody}" transform="translate(${-spec.screen.x},${-spec.screen.y})" fill="white"/>` +
+      `</svg>`;
+    cornerMaskPng = await sharp(Buffer.from(maskSvg)).png().toBuffer();
+  }
 
   return { spec, overlayPng, cornerMaskPng };
 }
