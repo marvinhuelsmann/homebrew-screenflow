@@ -2,6 +2,9 @@ import path from 'path';
 import { compose } from '../composer';
 import { Config } from '../config';
 import { DEFAULT_DEVICE, getDefaultColor, hasFrameColor } from '../frames';
+import { bold, cyan, dim, dot, fmtName, green, Spinner } from '../ui';
+import { detectInputKind, ensureFfmpeg, probeVideo } from '../ffmpeg';
+import { composeStaticVideo } from '../video-compose';
 
 interface FrameOptions {
   output?: string;
@@ -9,52 +12,7 @@ interface FrameOptions {
   jpeg?: boolean;
   color?: string;
   device?: string;
-}
-
-// ── Output helpers ────────────────────────────────────────────────────────────
-const tty = Boolean(process.stdout.isTTY);
-const cyan  = (s: string) => tty ? `\x1b[36m${s}\x1b[0m` : s;
-const green = (s: string) => tty ? `\x1b[32m${s}\x1b[0m` : s;
-const bold  = (s: string) => tty ? `\x1b[1m${s}\x1b[0m`  : s;
-const dim   = (s: string) => tty ? `\x1b[2m${s}\x1b[0m`  : s;
-const dot   = () => ` ${dim('·')} `;
-
-function fmtName(s: string): string {
-  return s.split('-')
-    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ')
-    .replace(/^Iphone\b/, 'iPhone')
-    .replace(/^Ipad\b/,   'iPad');
-}
-
-const SPINNER_FRAMES = [
-  '▁▁▁', '▂▁▁', '▃▂▁', '▄▃▂', '▅▄▃', '▆▅▄', '▇▆▅',
-  '█▇▆', '▇█▇', '▆▇█', '▅▆▇', '▄▅▆', '▃▄▅', '▂▃▄', '▁▂▃', '▁▁▂',
-];
-
-class Spinner {
-  private timer: ReturnType<typeof setInterval> | null = null;
-  private frame = 0;
-
-  constructor(private msg: string) {}
-
-  start(): void {
-    if (!tty) { process.stdout.write(`  ${this.msg}\n`); return; }
-    this.render();
-    this.timer = setInterval(() => this.render(), 80);
-  }
-
-  private render(): void {
-    const wave = cyan(SPINNER_FRAMES[this.frame % SPINNER_FRAMES.length]);
-    process.stdout.write(`\r${wave} ${this.msg}  `);
-    this.frame++;
-  }
-
-  stop(finalLine: string): void {
-    if (this.timer) { clearInterval(this.timer); this.timer = null; }
-    if (tty) process.stdout.write('\r\x1b[K');
-    console.log(finalLine);
-  }
+  mute?: boolean;
 }
 
 export async function frameAction(file: string, options: FrameOptions): Promise<void> {
@@ -69,6 +27,11 @@ export async function frameAction(file: string, options: FrameOptions): Promise<
   const base = path.basename(inputPath, path.extname(inputPath));
   const dir = path.dirname(inputPath);
 
+  if (detectInputKind(inputPath) === 'video') {
+    await frameVideo({ inputPath, base, dir, device, color, options });
+    return;
+  }
+
   const format = options.jpeg ? 'jpeg' : options.png ? 'png' : 'svg';
   const outExt = format === 'png' ? '.png' : format === 'jpeg' ? '.jpeg' : '.svg';
 
@@ -81,6 +44,45 @@ export async function frameAction(file: string, options: FrameOptions): Promise<
   s.start();
   await compose(inputPath, device, outputPath, format, color);
   s.stop(`${cyan('✦')} ${composeLabel}`);
+
+  console.log(`${green('✓')} Saved ${dim('→')} ${bold(path.basename(outputPath))}`);
+}
+
+// Wrap a screen recording in a static device frame: the device stays still, the
+// screen plays the recording, output length = recording length. Defaults to a
+// transparent .mov (ProRes 4444); pass -o foo.mp4 for an H.264 clip on black.
+async function frameVideo(args: {
+  inputPath: string;
+  base: string;
+  dir: string;
+  device: string;
+  color: string;
+  options: FrameOptions;
+}): Promise<void> {
+  const { inputPath, base, dir, device, color, options } = args;
+
+  if (options.png || options.jpeg) {
+    console.log(`${dim('·')} Image formats don't apply to screen recordings — writing a video instead.`);
+  }
+
+  await ensureFfmpeg();
+  const info = probeVideo(inputPath);
+
+  const outputPath = options.output
+    ? path.resolve(options.output)
+    : path.join(dir, `${base}_${device}_${color}.mov`);
+  const ext = path.extname(outputPath).toLowerCase();
+  const fmtLabel = ext === '.mov' ? 'MOV · ProRes 4444' : ext.slice(1).toUpperCase();
+
+  const composeLabel = `Framing ${bold(fmtName(device))}${dot()}${bold(fmtName(color))}${dot()}${dim(fmtLabel)}`;
+  const s = new Spinner(`${composeLabel}...`);
+  s.start();
+  const { exitCode, stderr } = await composeStaticVideo({
+    inputPath, device, color, outputPath, info, mute: Boolean(options.mute),
+  });
+  s.stop(`${cyan('✦')} ${composeLabel}`);
+
+  if (exitCode !== 0) throw new Error(`ffmpeg failed:\n${stderr}`);
 
   console.log(`${green('✓')} Saved ${dim('→')} ${bold(path.basename(outputPath))}`);
 }

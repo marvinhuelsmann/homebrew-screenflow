@@ -1,12 +1,13 @@
 import path from 'path';
 import os from 'os';
 import fs from 'fs';
-import { spawnSync, spawn } from 'child_process';
-import { confirm } from '@inquirer/prompts';
 import sharp from 'sharp';
 import { compose } from '../composer';
 import { Config } from '../config';
 import { DEFAULT_DEVICE, getDefaultColor, hasFrameColor } from '../frames';
+import { bold, cyan, dim, dot, fmtName, green, Spinner } from '../ui';
+import { detectInputKind, ensureFfmpeg, probeVideo, runFfmpeg } from '../ffmpeg';
+import { deviceCompositeChain, writeFrameInputs } from '../video-compose';
 
 export type VideoStyle = 'zoom-in' | 'zoom-out' | 'pan-down' | 'pan-left' | 'pan-right';
 
@@ -18,91 +19,16 @@ interface VideoOptions {
   tilt?: string;
   fps?: string;
   duration?: string;
+  mute?: boolean;
 }
 
 const DEFAULT_DURATION = 9; // seconds
-
-// ── Output helpers ────────────────────────────────────────────────────────────
-const tty = Boolean(process.stdout.isTTY);
-const cyan  = (s: string) => tty ? `\x1b[36m${s}\x1b[0m` : s;
-const green = (s: string) => tty ? `\x1b[32m${s}\x1b[0m` : s;
-const bold  = (s: string) => tty ? `\x1b[1m${s}\x1b[0m`  : s;
-const dim   = (s: string) => tty ? `\x1b[2m${s}\x1b[0m`  : s;
-const dot   = () => ` ${dim('·')} `;
-
-function fmtName(s: string): string {
-  return s.split('-')
-    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ')
-    .replace(/^Iphone\b/, 'iPhone')
-    .replace(/^Ipad\b/,   'iPad');
-}
-
-// Bouncing-dot spinner — animates while async work runs.
-// Dots rise and fall in a 3-column wave pattern.
-const SPINNER_FRAMES = [
-  '▁▁▁', '▂▁▁', '▃▂▁', '▄▃▂', '▅▄▃', '▆▅▄', '▇▆▅',
-  '█▇▆', '▇█▇', '▆▇█', '▅▆▇', '▄▅▆', '▃▄▅', '▂▃▄', '▁▂▃', '▁▁▂',
-];
-
-class Spinner {
-  private timer: ReturnType<typeof setInterval> | null = null;
-  private frame = 0;
-
-  constructor(private msg: string) {}
-
-  start(): void {
-    if (!tty) { process.stdout.write(`  ${this.msg}\n`); return; }
-    this.render();
-    this.timer = setInterval(() => this.render(), 80);
-  }
-
-  private render(): void {
-    const wave = cyan(SPINNER_FRAMES[this.frame % SPINNER_FRAMES.length]);
-    process.stdout.write(`\r${wave} ${this.msg}  `);
-    this.frame++;
-  }
-
-  stop(finalLine: string): void {
-    if (this.timer) { clearInterval(this.timer); this.timer = null; }
-    if (tty) process.stdout.write('\r\x1b[K');
-    console.log(finalLine);
-  }
-}
-
-function runFfmpeg(args: string[]): Promise<{ exitCode: number; stderr: string }> {
-  return new Promise((resolve, reject) => {
-    const proc = spawn('ffmpeg', args, { stdio: ['ignore', 'pipe', 'pipe'] });
-    const errChunks: Buffer[] = [];
-    proc.stderr?.on('data', (d: Buffer) => errChunks.push(d));
-    proc.on('error', reject);
-    proc.on('close', code => resolve({ exitCode: code ?? 1, stderr: Buffer.concat(errChunks).toString() }));
-  });
-}
 
 // Working canvas = 2.25× output. At 2.2× max zoom the crop covers 1964×1105
 // pixels from the 4320×2430 source → downscaled to 1920×1080 (ratio 0.978).
 // No upscaling occurs, so zoomed frames are just as sharp as the original.
 const CANVAS_W = 4320;
 const CANVAS_H = 2430;
-
-function ffmpegAvailable(): boolean {
-  const r = spawnSync('ffmpeg', ['-version'], { stdio: 'ignore' });
-  return !r.error;
-}
-
-async function ensureFfmpeg(): Promise<void> {
-  if (ffmpegAvailable()) return;
-
-  console.log(`${cyan('✦')} ffmpeg is required but was not found.`);
-  const install = await confirm({ message: 'Install ffmpeg via Homebrew now?' });
-  if (!install) throw new Error('ffmpeg is required — install it with: brew install ffmpeg');
-
-  console.log(`${cyan('✦')} Installing ffmpeg via Homebrew...`);
-  const r = spawnSync('brew', ['install', 'ffmpeg'], { stdio: 'inherit' });
-  if (r.status !== 0) throw new Error('Homebrew install failed. Run: brew install ffmpeg');
-  if (!ffmpegAvailable()) throw new Error('ffmpeg still not found after install — check your PATH');
-}
 
 // Applied AFTER the zoom/pan animation so the pan direction is unaffected by
 // the perspective warp. The shrink→pad→stretch pre-step compensates for the
@@ -193,19 +119,37 @@ export async function videoAction(file: string, options: VideoOptions): Promise<
   if (isNaN(fps) || fps < 24 || fps > 120) {
     throw new Error('--fps must be a number between 24 and 120');
   }
-  const duration = parseFloat(options.duration ?? String(DEFAULT_DURATION));
-  if (isNaN(duration) || duration < 1 || duration > 60) {
-    throw new Error('--duration must be a number between 1 and 60');
-  }
   const h264Level = fps <= 60 ? '4.2' : '5.1';
 
   const inputPath = path.resolve(file);
   const base = path.basename(inputPath, path.extname(inputPath));
   const dir  = path.dirname(inputPath);
-
   const outputPath = options.output
     ? path.resolve(options.output)
     : path.join(dir, `${base}_${device}_${color}.mp4`);
+
+  if (detectInputKind(inputPath) === 'video') {
+    if (options.duration !== undefined && options.duration !== String(DEFAULT_DURATION)) {
+      console.log(`${dim('·')} --duration is ignored for screen recordings — the clip matches the recording length.`);
+    }
+    await animateRecording({ inputPath, outputPath, device, color, style, tilt, fps, h264Level, mute: Boolean(options.mute) });
+    return;
+  }
+
+  const duration = parseFloat(options.duration ?? String(DEFAULT_DURATION));
+  if (isNaN(duration) || duration < 1 || duration > 60) {
+    throw new Error('--duration must be a number between 1 and 60');
+  }
+
+  await animateStill({ inputPath, outputPath, device, color, style, tilt, fps, h264Level, duration });
+}
+
+// Existing behaviour: composite a still, loop it, and apply the camera move.
+async function animateStill(args: {
+  inputPath: string; outputPath: string; device: string; color: string;
+  style: VideoStyle; tilt: number; fps: number; h264Level: string; duration: number;
+}): Promise<void> {
+  const { inputPath, outputPath, device, color, style, tilt, fps, h264Level, duration } = args;
 
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'screenflow-'));
   const tmpPng = path.join(tmpDir, 'frame.png');
@@ -235,16 +179,13 @@ export async function videoAction(file: string, options: VideoOptions): Promise<
   fs.writeFileSync(tmpPng, flatBuf);
   s1.stop(`${cyan('✦')} ${composeLabel}`);
 
-  const animFilters = buildAnimFilter(style, duration);
-  const tiltFilters = buildTiltFilter(tilt);
-
   // fps filter first to normalise input timestamps before the crop expressions
   // read `t` — same reason we kept it before zoompan previously.
   const vf = [
     `fps=${fps}`,
     `pad=${CANVAS_W}:${CANVAS_H}:(ow-iw)/2:(oh-ih)/2:black`,
-    ...animFilters,   // crop → scale → 1920×1080
-    ...tiltFilters,   // perspective warp last (pan unaffected)
+    ...buildAnimFilter(style, duration),
+    ...buildTiltFilter(tilt),
   ].join(',');
 
   const encodeParts = [bold(style), ...(tilt > 0 ? ['3D tilt'] : []), `${fps}fps`, `${duration}s`];
@@ -273,6 +214,75 @@ export async function videoAction(file: string, options: VideoOptions): Promise<
   s2.stop(`${cyan('✦')} ${encodeLabel}`);
 
   if (exitCode !== 0) throw new Error(`ffmpeg failed:\n${stderr}`);
-
   console.log(`${green('✓')} Saved ${dim('→')} ${bold(path.basename(outputPath))}`);
+}
+
+// New behaviour: the screen recording plays live inside the device while the
+// camera move runs. Clip length = recording length (overrides --duration).
+async function animateRecording(args: {
+  inputPath: string; outputPath: string; device: string; color: string;
+  style: VideoStyle; tilt: number; fps: number; h264Level: string; mute: boolean;
+}): Promise<void> {
+  const { inputPath, outputPath, device, color, style, tilt, fps, h264Level, mute } = args;
+
+  const info = probeVideo(inputPath);
+  const duration = info.durationSec;
+
+  const { tmpDir, inputArgs, hasMask, spec } = await writeFrameInputs(device, color, fps);
+
+  try {
+    // Same fit-to-canvas scaling as animateStill, but using the device canvas
+    // dimensions (the per-frame composite is exactly spec.canvas).
+    const nW = spec.canvas.w;
+    const nH = spec.canvas.h;
+    const srcCanvasW = Math.max(nW, Math.round(nH * 16 / 9));
+    const srcCanvasH = Math.max(nH, Math.round(nW * 9 / 16));
+    const sc   = Math.min(CANVAS_W / srcCanvasW, CANVAS_H / srcCanvasH);
+    const newW = Math.floor(nW * sc / 2) * 2;
+    const newH = Math.floor(nH * sc / 2) * 2;
+
+    const dev = deviceCompositeChain({ spec, fps, transparent: false, hasMask, out: 'dev' });
+    const post = [
+      `scale=${newW}:${newH}:flags=lanczos`,
+      `pad=${CANVAS_W}:${CANVAS_H}:(ow-iw)/2:(oh-ih)/2:black`,
+      ...buildAnimFilter(style, duration),
+      ...buildTiltFilter(tilt),
+    ].join(',');
+    const filter = `${dev};[dev]${post}[outv]`;
+
+    const audio = (mute || !info.hasAudio)
+      ? ['-an']
+      : ['-map', '0:a?', '-c:a', 'aac', '-b:a', '192k'];
+
+    const encodeParts = [bold(style), ...(tilt > 0 ? ['3D tilt'] : []), `${fps}fps`, `${duration.toFixed(1)}s`];
+    const encodeLabel = `Encoding ${encodeParts.join(dot())}`;
+    const s = new Spinner(`${encodeLabel}...`);
+    s.start();
+
+    const { exitCode, stderr } = await runFfmpeg([
+      '-y',
+      '-i', inputPath,
+      ...inputArgs,
+      '-filter_complex', filter,
+      '-map', '[outv]',
+      ...audio,
+      '-c:v', 'libx264',
+      '-profile:v', 'high',
+      '-level', h264Level,
+      '-t', duration.toFixed(3),
+      '-pix_fmt', 'yuv420p',
+      '-r', String(fps),
+      '-g', String(fps * 2),
+      '-preset', 'slow',
+      '-crf', '12',
+      '-movflags', '+faststart',
+      outputPath,
+    ]);
+
+    s.stop(`${cyan('✦')} ${encodeLabel}`);
+    if (exitCode !== 0) throw new Error(`ffmpeg failed:\n${stderr}`);
+    console.log(`${green('✓')} Saved ${dim('→')} ${bold(path.basename(outputPath))}`);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
 }

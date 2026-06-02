@@ -20,8 +20,9 @@ complete -c screenflow -n '__fish_screenflow_no_subcommand' -f -a 'author'      
 
 # Frame options (no subcommand — default frame command)
 complete -c screenflow -n '__fish_screenflow_no_subcommand' -s o -l output -r -d 'Output file path'
-complete -c screenflow -n '__fish_screenflow_no_subcommand'      -l png       -d 'Output as PNG instead of SVG'
-complete -c screenflow -n '__fish_screenflow_no_subcommand'      -l jpeg      -d 'Output as JPEG instead of SVG'
+complete -c screenflow -n '__fish_screenflow_no_subcommand'      -l png       -d 'Output as PNG instead of SVG (still images only)'
+complete -c screenflow -n '__fish_screenflow_no_subcommand'      -l jpeg      -d 'Output as JPEG instead of SVG (still images only)'
+complete -c screenflow -n '__fish_screenflow_no_subcommand'      -l mute      -d 'Drop the audio track (screen recordings only)'
 complete -c screenflow -n '__fish_screenflow_no_subcommand' -s d -l device -r -d 'Device frame'
 complete -c screenflow -n '__fish_screenflow_no_subcommand' -s c -l color  -r -d 'Frame color'
 
@@ -33,6 +34,7 @@ complete -c screenflow -n '__fish_seen_subcommand_from video' -s s -l style  -r 
   -a 'zoom-in\t"Zoom in 1× → 2.2×, pan upward (default)" zoom-out\t"Zoom out 2.2× → 1×" pan-down\t"Pan top → bottom" pan-left\t"Pan right → left" pan-right\t"Pan left → right"'
 complete -c screenflow -n '__fish_seen_subcommand_from video' -s t -l tilt   -r -d 'Perspective tilt downward in degrees (0–45)'
 complete -c screenflow -n '__fish_seen_subcommand_from video'      -l fps    -r -d 'Frame rate' -a '24\t"24 fps" 30\t"30 fps" 60\t"60 fps (default)" 120\t"120 fps"'
+complete -c screenflow -n '__fish_seen_subcommand_from video'      -l mute      -d 'Drop the audio track (screen recordings only)'
 
 # Devices
 set -l __screenflow_devices 'iphone-17-pro\t"iPhone 17 Pro (default)" iphone-17\t"iPhone 17" iphone-16-pro\t"iPhone 16 Pro" iphone-16\t"iPhone 16" iphone-air\t"iPhone Air" ipad-pro-11\t"iPad Pro 11" ipad-pro-13\t"iPad Pro 13" imac\t"iMac"'
