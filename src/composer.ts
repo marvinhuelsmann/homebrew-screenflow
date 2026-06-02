@@ -1,7 +1,9 @@
 import sharp from 'sharp';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import { FRAMES, FrameSpec, getDefaultColor } from './frames';
+import { ffmpegAvailable, runFfmpeg } from './ffmpeg';
 
 export type Format = 'svg' | 'png' | 'jpeg';
 
@@ -223,6 +225,80 @@ async function composeOverlay(
   else await composed.png({ compressionLevel: 6 }).toFile(outputPath);
 }
 
+// ── Frame assets for the video pipeline ──────────────────────────────────────
+
+export interface FrameAssets {
+  spec: FrameSpec;
+  // Canvas-sized PNG with a transparent screen hole (and transparent area
+  // outside the device). Composited on top of every video frame by ffmpeg.
+  overlayPng: Buffer;
+  // screen-sized white-on-black rounded-rect luma mask for ffmpeg `alphamerge`,
+  // or null when the bezel itself defines the rounded screen (vector frames).
+  cornerMaskPng: Buffer | null;
+}
+
+// Builds the static overlay + corner mask once so the video compositing can run
+// in a single ffmpeg pass. The rounded-corner handling mirrors the still
+// pipeline: raster/overlay frames round the screen via `cornerRadius`, vector
+// frames rely on the opaque bezel in the overlay covering the screen corners.
+export async function buildFrameAssets(
+  deviceInput: string,
+  colorInput = getDefaultColor(deviceInput),
+): Promise<FrameAssets> {
+  const device = resolveDevice(deviceInput);
+  const color = resolveColor(device, colorInput);
+  const spec = FRAMES[device];
+
+  const framePath = path.join(__dirname, 'frames', device, spec.colors[color]);
+  const frameSvg = fs.readFileSync(framePath, 'utf8');
+
+  const overlayPng = spec.frameType === 'raster'
+    ? extractEmbeddedPng(frameSvg)
+    : await sharp(Buffer.from(frameSvg)).png().toBuffer();
+
+  const r = spec.cornerRadius ?? 0;
+  const cornerMaskPng = r > 0
+    ? await sharp(Buffer.from(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${spec.screen.w}" height="${spec.screen.h}">` +
+        `<rect width="${spec.screen.w}" height="${spec.screen.h}" fill="black"/>` +
+        `<rect width="${spec.screen.w}" height="${spec.screen.h}" rx="${r}" fill="white"/>` +
+        `</svg>`,
+      )).png().toBuffer()
+    : null;
+
+  return { spec, overlayPng, cornerMaskPng };
+}
+
+// Makes the input readable by sharp. PNG/JPG/WebP/TIFF decode natively; HEIC/HEIF
+// need a libheif HEVC plugin that isn't always present, so on decode failure we
+// transparently fall back to decoding a single frame with ffmpeg.
+async function ensureStillReadable(
+  inputPath: string,
+): Promise<{ path: string; cleanup: () => void }> {
+  const noop = { path: inputPath, cleanup: () => {} };
+  const ext = path.extname(inputPath).toLowerCase();
+  if (ext !== '.heic' && ext !== '.heif') return noop;
+
+  try {
+    await sharp(inputPath).stats(); // forces a real decode
+    return noop;
+  } catch {
+    if (!ffmpegAvailable()) {
+      throw new Error(
+        `Could not decode "${path.basename(inputPath)}". HEIC/HEIF support needs ffmpeg — install it with: brew install ffmpeg`,
+      );
+    }
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'screenflow-'));
+    const pngPath = path.join(tmpDir, 'input.png');
+    const { exitCode, stderr } = await runFfmpeg(['-y', '-i', inputPath, '-frames:v', '1', pngPath]);
+    if (exitCode !== 0) {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+      throw new Error(`Could not decode "${path.basename(inputPath)}":\n${stderr}`);
+    }
+    return { path: pngPath, cleanup: () => fs.rmSync(tmpDir, { recursive: true, force: true }) };
+  }
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export async function compose(
@@ -239,11 +315,16 @@ export async function compose(
   const framePath = path.join(__dirname, 'frames', device, spec.colors[color]);
   const frameSvg = fs.readFileSync(framePath, 'utf8');
 
-  if (spec.frameType === 'raster') {
-    await composeRaster(inputPath, spec, frameSvg, outputPath, format);
-  } else if (spec.frameType === 'overlay') {
-    await composeOverlay(inputPath, spec, frameSvg, outputPath, format);
-  } else {
-    await composeVector(inputPath, spec, frameSvg, outputPath, format);
+  const { path: input, cleanup } = await ensureStillReadable(inputPath);
+  try {
+    if (spec.frameType === 'raster') {
+      await composeRaster(input, spec, frameSvg, outputPath, format);
+    } else if (spec.frameType === 'overlay') {
+      await composeOverlay(input, spec, frameSvg, outputPath, format);
+    } else {
+      await composeVector(input, spec, frameSvg, outputPath, format);
+    }
+  } finally {
+    cleanup();
   }
 }

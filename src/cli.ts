@@ -41,12 +41,13 @@ function buildProgram(): Command {
     .description('Wrap simulator screenshots in a device frame — pixel-perfect, no clock, no Dynamic Island')
     .version(version, '-v, --version')
     .helpOption('-h, --help', 'Show help')
-    .argument('[file]', 'Screenshot image file (PNG, JPG)')
+    .argument('[file]', 'Screenshot or screen recording (PNG, JPG, HEIC, MP4, MOV, …)')
     .option('-o, --output <path>', 'Output file path')
-    .option('--png', 'Output as PNG instead of SVG')
-    .option('--jpeg', 'Output as JPEG instead of SVG')
+    .option('--png', 'Output as PNG instead of SVG (still images only)')
+    .option('--jpeg', 'Output as JPEG instead of SVG (still images only)')
     .option('-d, --device <device>', 'Device frame (e.g. iphone-17-pro)')
     .option('-c, --color <color>', 'Frame color for the chosen device')
+    .option('--mute', 'Drop the audio track (screen recordings only)')
     .action(async (file: string | undefined, options) => {
       if (!file) {
         program.help();
@@ -63,14 +64,15 @@ function buildProgram(): Command {
 
   program
     .command('video <file>')
-    .description('Create an animated marketing video (requires ffmpeg)')
+    .description('Create an animated marketing video — from a screenshot or a screen recording (requires ffmpeg)')
     .option('-o, --output <path>', 'Output file path')
     .option('-d, --device <device>', 'Device frame (e.g. iphone-17-pro)')
     .option('-c, --color <color>', 'Frame color for the chosen device')
     .option('-s, --style <style>', `Animation style: ${VALID_STYLES.join(' | ')}`, 'zoom-in')
     .option('-t, --tilt <degrees>', 'Perspective tilt downward in degrees (0–45)', '0')
     .option('--fps <fps>', 'Frame rate: 24, 30, 60, or 120', '60')
-    .option('--duration <seconds>', 'Animation length in seconds (1–60)', '9')
+    .option('--duration <seconds>', 'Animation length in seconds (1–60); ignored for screen recordings', '9')
+    .option('--mute', 'Drop the audio track when the input is a screen recording')
     .action(async (file: string, options) => {
       if (!VALID_STYLES.includes(options.style)) {
         console.error(`\nError: Unknown style "${options.style}". Choose from: ${VALID_STYLES.join(', ')}\n`);
