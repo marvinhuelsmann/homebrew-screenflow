@@ -38,8 +38,9 @@ screenflow screenshot.png
 |---|---|---|
 | `--device <device>` | `-d` | Device frame (default: `iphone-17-pro`) |
 | `--color <color>` | `-c` | Frame color (default: first color for the chosen device) |
-| `--png` | | Output as PNG instead of SVG |
-| `--jpeg` | | Output as JPEG instead of SVG |
+| `--png` | | Output as PNG instead of SVG (still images only) |
+| `--jpeg` | | Output as JPEG instead of SVG (still images only) |
+| `--mp4` | | Output as MP4 · H.264 on black instead of MOV · ProRes 4444 · Transparent (screen recordings only) |
 | `--output <path>` | `-o` | Custom output file path |
 
 ### Examples
@@ -122,6 +123,42 @@ screenflow video screenshot.png --fps 120 --duration 5
 
 Output is always `1920 × 1080` H.264 MP4, CRF 12.
 
+### Screen recordings & HEIC input
+
+The commands are the same — just hand them a **screen recording** (`.mp4`, `.mov`, `.m4v`, `.webm`, `.mkv`, `.avi`) or any still image (including **`.heic`/`.heif`**) instead of a PNG/JPG. screenflow detects the input type automatically (**requires ffmpeg** for video).
+
+| Input | `screenflow <file>` (default) | `screenflow video <file>` |
+|---|---|---|
+| **Still image** (PNG/JPG/HEIC) | Static framed image (SVG/PNG/JPEG) | Animated marketing clip (`--duration` seconds) |
+| **Screen recording** (MP4/MOV/…) | Device stays still, the **screen plays the recording** | Camera animation (zoom/pan/tilt) runs **while the screen plays** |
+
+For a screen recording the output is **always a video whose length matches the recording**. `--duration` is therefore ignored for the `video` command, and `--png`/`--jpeg` don't apply to the default command.
+
+```bash
+# Static framing of a screen recording → transparent .mov (ProRes 4444), audio kept
+screenflow recording.mov -d iphone-17-pro
+# → recording_iphone-17-pro_cosmic-orange.mov
+
+# H.264 .mp4 on a black background instead
+screenflow recording.mov --mp4
+# → recording_iphone-17-pro_cosmic-orange.mp4
+
+# Drop the audio track
+screenflow recording.mov --mute
+
+# Animate a screen recording (length = recording), 15° tilt
+screenflow video recording.mov --style zoom-in --tilt 15
+
+# HEIC still works just like a PNG
+screenflow shot.heic -d iphone-17 --png
+```
+
+- **Default command + recording** → transparent **`.mov` (ProRes 4444)** — alpha channel preserved, perfect for compositing in Final Cut or After Effects; use `--mp4` for H.264 on a black background.
+- **`video` command + recording** → `1920 × 1080` H.264 MP4 (the established marketing format).
+- Audio from the recording is kept by default; use `--mute` to strip it.
+
+> Note: large canvases (iMac, iPad) as transparent ProRes can produce very large files.
+
 ### Supported Devices
 
 | Device | ID | Colors |
@@ -151,8 +188,11 @@ brew upgrade screenflow
 src/
   index.ts          ← entry point (3 lines)
   cli.ts            ← program setup + command routing
-  composer.ts       ← SVG compositing and output rendering
+  composer.ts       ← SVG compositing, output rendering + buildFrameAssets (video overlay/mask)
   config.ts         ← Config class (reads/writes ~/.config/screenflow/config.json)
+  ui.ts             ← shared terminal helpers (spinner, colors, name formatting)
+  ffmpeg.ts         ← shared ffmpeg/ffprobe helpers + input-kind detection
+  video-compose.ts  ← ffmpeg filtergraph for compositing a recording inside a frame
   frames/
     index.ts        ← FRAMES registry — source of truth for devices, colors, dimensions
     iphone-17-pro/  ← SVG frame files per color
@@ -265,7 +305,7 @@ The first color registered for a device is used as that device's automatic defau
    npm run build
    node dist/index.js screenshot.png --device iphone-18-pro
    ```
-3. Push and open a PR against `master`:
+3. Push and open a PR against `develop`:
    ```bash
    git push origin feat/iphone-18-pro
    ```
