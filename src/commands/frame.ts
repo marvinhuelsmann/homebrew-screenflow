@@ -10,6 +10,7 @@ interface FrameOptions {
   output?: string;
   png?: boolean;
   jpeg?: boolean;
+  mp4?: boolean;
   color?: string;
   device?: string;
   mute?: boolean;
@@ -32,6 +33,9 @@ export async function frameAction(file: string, options: FrameOptions): Promise<
     return;
   }
 
+  if (options.mp4) {
+    throw new Error('--mp4 requires a screen recording as input.\nFor an animated MP4 from a still image use: screenflow video <image>');
+  }
   const format = options.jpeg ? 'jpeg' : options.png ? 'png' : 'svg';
   const outExt = format === 'png' ? '.png' : format === 'jpeg' ? '.jpeg' : '.svg';
 
@@ -50,7 +54,7 @@ export async function frameAction(file: string, options: FrameOptions): Promise<
 
 // Wrap a screen recording in a static device frame: the device stays still, the
 // screen plays the recording, output length = recording length. Defaults to a
-// transparent .mov (ProRes 4444); pass -o foo.mp4 for an H.264 clip on black.
+// transparent .mov (ProRes 4444); pass --mp4 for an H.264 clip on black.
 async function frameVideo(args: {
   inputPath: string;
   base: string;
@@ -62,17 +66,19 @@ async function frameVideo(args: {
   const { inputPath, base, dir, device, color, options } = args;
 
   if (options.png || options.jpeg) {
-    console.log(`${dim('·')} Image formats don't apply to screen recordings — writing a video instead.`);
+    const flag = options.png ? '--png' : '--jpeg';
+    throw new Error(`${flag} requires a still image as input, not a screen recording.\nTo frame a still image use: screenflow <image> ${flag}\nTo frame a recording as video use: screenflow <recording> (default: MOV · ProRes 4444 · Transparent)`);
   }
 
   await ensureFfmpeg();
   const info = probeVideo(inputPath);
 
+  const defaultExt = options.mp4 ? '.mp4' : '.mov';
   const outputPath = options.output
     ? path.resolve(options.output)
-    : path.join(dir, `${base}_${device}_${color}.mov`);
+    : path.join(dir, `${base}_${device}_${color}${defaultExt}`);
   const ext = path.extname(outputPath).toLowerCase();
-  const fmtLabel = ext === '.mov' ? 'MOV · ProRes 4444' : ext.slice(1).toUpperCase();
+  const fmtLabel = ext === '.mov' ? 'MOV · ProRes 4444 · Transparent' : 'MP4 · H.264';
 
   const composeLabel = `Framing ${bold(fmtName(device))}${dot()}${bold(fmtName(color))}${dot()}${dim(fmtLabel)}`;
   const s = new Spinner(`${composeLabel}...`);

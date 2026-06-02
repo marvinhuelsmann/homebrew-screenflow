@@ -38,8 +38,9 @@ screenflow screenshot.png
 |---|---|---|
 | `--device <device>` | `-d` | Device frame (default: `iphone-17-pro`) |
 | `--color <color>` | `-c` | Frame color (default: first color for the chosen device) |
-| `--png` | | Output as PNG instead of SVG |
-| `--jpeg` | | Output as JPEG instead of SVG |
+| `--png` | | Output as PNG instead of SVG (still images only) |
+| `--jpeg` | | Output as JPEG instead of SVG (still images only) |
+| `--mp4` | | Output as MP4 · H.264 on black instead of MOV · ProRes 4444 · Transparent (screen recordings only) |
 | `--output <path>` | `-o` | Custom output file path |
 
 ### Examples
@@ -138,8 +139,9 @@ For a screen recording the output is **always a video whose length matches the r
 screenflow recording.mov -d iphone-17-pro
 # → recording_iphone-17-pro_cosmic-orange.mov
 
-# Force an H.264 .mp4 on a black background instead
-screenflow recording.mov -o framed.mp4
+# H.264 .mp4 on a black background instead
+screenflow recording.mov --mp4
+# → recording_iphone-17-pro_cosmic-orange.mp4
 
 # Drop the audio track
 screenflow recording.mov --mute
@@ -151,7 +153,7 @@ screenflow video recording.mov --style zoom-in --tilt 15
 screenflow shot.heic -d iphone-17 --png
 ```
 
-- **Default command + recording** → transparent **`.mov` (ProRes 4444)** by default so it matches the transparent still output; pass `-o <name>.mp4` for an H.264 clip on a black background.
+- **Default command + recording** → transparent **`.mov` (ProRes 4444)** — alpha channel preserved, perfect for compositing in Final Cut or After Effects; use `--mp4` for H.264 on a black background.
 - **`video` command + recording** → `1920 × 1080` H.264 MP4 (the established marketing format).
 - Audio from the recording is kept by default; use `--mute` to strip it.
 
