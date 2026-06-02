@@ -303,7 +303,7 @@ The first color registered for a device is used as that device's automatic defau
    npm run build
    node dist/index.js screenshot.png --device iphone-18-pro
    ```
-3. Push and open a PR against `master`:
+3. Push and open a PR against `develop`:
    ```bash
    git push origin feat/iphone-18-pro
    ```
