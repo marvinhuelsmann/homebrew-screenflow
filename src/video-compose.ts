@@ -54,8 +54,9 @@ export async function writeFrameInputs(
   device: string,
   color: string,
   fps: number,
+  info?: VideoInfo,
 ): Promise<{ tmpDir: string; inputArgs: string[]; hasMask: boolean; spec: FrameSpec }> {
-  const { spec, overlayPng, cornerMaskPng } = await buildFrameAssets(device, color);
+  const { spec, overlayPng, cornerMaskPng } = await buildFrameAssets(device, color, info?.width, info?.height);
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'screenflow-'));
   const overlayPath = path.join(tmpDir, 'overlay.png');
   fs.writeFileSync(overlayPath, overlayPng);
@@ -84,7 +85,7 @@ export async function composeStaticVideo(opts: {
   const transparent = path.extname(outputPath).toLowerCase() === '.mov';
   const fps = info.avgFps > 0 ? info.avgFps : 30;
 
-  const { tmpDir, inputArgs, hasMask, spec } = await writeFrameInputs(device, color, fps);
+  const { tmpDir, inputArgs, hasMask, spec } = await writeFrameInputs(device, color, fps, info);
 
   try {
     const chain = deviceCompositeChain({ spec, fps, transparent, hasMask, out: 'comp' });

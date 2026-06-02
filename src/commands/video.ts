@@ -228,7 +228,7 @@ async function animateRecording(args: {
   const info = probeVideo(inputPath);
   const duration = info.durationSec;
 
-  const { tmpDir, inputArgs, hasMask, spec } = await writeFrameInputs(device, color, fps);
+  const { tmpDir, inputArgs, hasMask, spec } = await writeFrameInputs(device, color, fps, info);
 
   try {
     // Same fit-to-canvas scaling as animateStill, but using the device canvas
