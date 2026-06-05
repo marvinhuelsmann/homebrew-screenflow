@@ -1,6 +1,6 @@
 function __fish_screenflow_no_subcommand
     for i in (commandline -opc)
-        if contains -- $i video devices config set-default author
+        if contains -- $i video appstore devices config set-default author
             return 1
         end
     end
@@ -13,6 +13,7 @@ complete -c screenflow -s h -l help    -d 'Display help'
 
 # Subcommands (only when no subcommand has been given yet)
 complete -c screenflow -n '__fish_screenflow_no_subcommand' -f -a 'video'       -d 'Create a 9-second animated marketing video apple-watch-ultra\t"Apple Watch Ultra" apple-watch-series-11\t"Apple Watch Series 11""'
+complete -c screenflow -n '__fish_screenflow_no_subcommand' -f -a 'appstore'    -d 'Generate a ready-to-upload App Store screenshot (1290×2796)'
 complete -c screenflow -n '__fish_screenflow_no_subcommand' -f -a 'devices'     -d 'List all available devices and their colors'
 complete -c screenflow -n '__fish_screenflow_no_subcommand' -f -a 'config'      -d 'Show saved defaults'
 complete -c screenflow -n '__fish_screenflow_no_subcommand' -f -a 'set-default' -d 'Set a default device and color interactively'
@@ -36,11 +37,21 @@ complete -c screenflow -n '__fish_seen_subcommand_from video' -s t -l tilt   -r 
 complete -c screenflow -n '__fish_seen_subcommand_from video'      -l fps    -r -d 'Frame rate' -a '24\t"24 fps" 30\t"30 fps" 60\t"60 fps (default)" 120\t"120 fps"'
 complete -c screenflow -n '__fish_seen_subcommand_from video'      -l mute      -d 'Drop the audio track (screen recordings only)'
 
+# App Store options
+complete -c screenflow -n '__fish_seen_subcommand_from appstore' -s o -l output  -r -d 'Output file path'
+complete -c screenflow -n '__fish_seen_subcommand_from appstore'      -l caption -r -d 'Headline text rendered above the device'
+complete -c screenflow -n '__fish_seen_subcommand_from appstore'      -l align   -r -d 'Caption alignment' -a 'left\t"Left" center\t"Center (default)" right\t"Right"'
+complete -c screenflow -n '__fish_seen_subcommand_from appstore'      -l bg      -r -d 'Background color (hex, e.g. #0A84FF)'
+complete -c screenflow -n '__fish_seen_subcommand_from appstore'      -l jpeg       -d 'Output as JPEG instead of PNG'
+complete -c screenflow -n '__fish_seen_subcommand_from appstore' -s d -l device  -r -d 'Device frame'
+complete -c screenflow -n '__fish_seen_subcommand_from appstore' -s c -l color   -r -d 'Frame color'
+
 # Devices
 set -l __screenflow_devices 'iphone-17-pro\t"iPhone 17 Pro (default)" iphone-17\t"iPhone 17" iphone-16-pro\t"iPhone 16 Pro" iphone-16\t"iPhone 16" iphone-air\t"iPhone Air" ipad-pro-11\t"iPad Pro 11" ipad-pro-13\t"iPad Pro 13" imac\t"iMac"'
 
-complete -c screenflow -n '__fish_screenflow_no_subcommand'    -l device -r -a $__screenflow_devices
-complete -c screenflow -n '__fish_seen_subcommand_from video'  -l device -r -a $__screenflow_devices
+complete -c screenflow -n '__fish_screenflow_no_subcommand'       -l device -r -a $__screenflow_devices
+complete -c screenflow -n '__fish_seen_subcommand_from video'     -l device -r -a $__screenflow_devices
+complete -c screenflow -n '__fish_seen_subcommand_from appstore'  -l device -r -a $__screenflow_devices
 
 # Colors — scoped per device
 set -l __sf_colors_17pro  'cosmic-orange\t"Cosmic Orange (default)" deep-blue\t"Deep Blue" silver\t"Silver"'
@@ -52,7 +63,7 @@ set -l __sf_colors_11     'silver\t"Silver" silver-with-apple-pencil\t"Silver + 
 set -l __sf_colors_13     'silver\t"Silver" space-gray\t"Space Gray"'
 set -l __sf_colors_imac   'blue\t"Blue" green\t"Green" orange\t"Orange" pink\t"Pink" purple\t"Purple" silver\t"Silver" yellow\t"Yellow"'
 
-for __sf_sub in '' video
+for __sf_sub in '' video appstore
     set -l __sf_cond (test -n "$__sf_sub"; and echo "__fish_seen_subcommand_from $__sf_sub"; or echo '__fish_screenflow_no_subcommand')
 
     complete -c screenflow -n "$__sf_cond" -l color -r \
