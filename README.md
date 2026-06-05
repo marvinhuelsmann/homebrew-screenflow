@@ -112,7 +112,7 @@ screenflow video screenshot.png --duration 15
 screenflow video screenshot.png --style pan-down
 
 # Zoom out with specific device and color
-screenflow video screenshot.png -d iphone-16-pro -c dessert-titanium --style zoom-out
+screenflow video screenshot.png -d iphone-16-pro -c natural --style zoom-out
 
 # Pan left with custom output
 screenflow video screenshot.png --style pan-left -o ~/Desktop/promo.mp4
@@ -167,7 +167,7 @@ screenflow shot.heic -d iphone-17 --png
 | Device | ID | Colors |
 |---|---|---|
 | iPhone 17 Pro | `iphone-17-pro` | `cosmic-orange`, `deep-blue`, `silver` |
-| iPhone 16 Pro | `iphone-16-pro` | `dessert-titanium`, `black`, `natural`, `white` |
+| iPhone 16 Pro | `iphone-16-pro` | `black`, `natural`, `white` |
 | iPad Pro 11" | `ipad-pro-11` | `silver`, `silver-with-apple-pencil`, `space-gray`, `space-gray-with-apple-pencil` |
 | iPad Pro 13" | `ipad-pro-13` | `silver`, `space-gray` |
 | iPhone Air | `iphone-air` | `black`, `blue`, `gold`, `white` |
