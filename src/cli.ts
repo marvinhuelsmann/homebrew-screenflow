@@ -2,6 +2,7 @@ import { Command } from 'commander';
 import { version } from '../package.json';
 import { frameAction } from './commands/frame';
 import { videoAction } from './commands/video';
+import { appstoreAction } from './commands/appstore';
 import { setDefaultAction } from './commands/setDefault';
 import { devicesAction } from './commands/devices';
 import { showConfigAction } from './commands/showConfig';
@@ -81,6 +82,26 @@ function buildProgram(): Command {
       }
       try {
         await videoAction(file, options);
+      } catch (err) {
+        console.error('');
+        console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
+        process.exit(1);
+      }
+    });
+
+  program
+    .command('appstore <file>')
+    .description('Generate a ready-to-upload App Store screenshot (1242×2688) — caption on top, framed device below, on a solid background')
+    .option('-o, --output <path>', 'Output file path')
+    .option('-d, --device <device>', 'Device frame (e.g. iphone-17-pro)')
+    .option('-c, --color <color>', 'Frame color for the chosen device')
+    .option('--caption <text>', 'Headline text rendered above the device')
+    .option('--align <align>', 'Caption alignment: left | center | right', 'center')
+    .option('--bg <color>', 'Background color (hex, e.g. "#0A84FF")', '#0A84FF')
+    .option('--jpeg', 'Output as JPEG instead of PNG')
+    .action(async (file: string, options) => {
+      try {
+        await appstoreAction(file, options);
       } catch (err) {
         console.error('');
         console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);

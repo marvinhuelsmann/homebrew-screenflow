@@ -27,6 +27,7 @@ screenflow screenshot.png
 |---|---|
 | `screenflow <file>` | Frame a screenshot (default) |
 | `screenflow video <file>` | Create an animated marketing video |
+| `screenflow appstore <file>` | Generate a ready-to-upload App Store screenshot |
 | `screenflow devices` | List all available devices and their colors |
 | `screenflow config` | Show your saved defaults |
 | `screenflow set-default` | Set a default device and color interactively |
@@ -125,6 +126,40 @@ screenflow video screenshot.png --fps 120 --duration 5
 ```
 
 Output is always `1920 × 1080` H.264 MP4, CRF 12.
+
+### App Store screenshots
+
+`screenflow appstore <file>` turns a single screenshot into a **ready-to-upload App Store screenshot** at the mandatory **1242 × 2688** (iPhone 6.5") size: a headline caption on top, the framed device below, on a solid background. The caption is set in **SF Pro Display**, and its color is chosen automatically for contrast against the background. Use `\n` in the caption for manual line breaks (long captions also wrap automatically).
+
+#### App Store options
+
+| Option | Short | Description |
+|---|---|---|
+| `--caption <text>` | | Headline text rendered above the device |
+| `--align <align>` | | Caption alignment: `left` \| `center` \| `right` (default `center`) |
+| `--bg <color>` | | Background color, hex (default `#0A84FF`) |
+| `--device <device>` | `-d` | Device frame |
+| `--color <color>` | `-c` | Frame color |
+| `--jpeg` | | Output as JPEG instead of PNG |
+| `--output <path>` | `-o` | Custom output file path |
+
+```bash
+# Hero screenshot — blue background, centered caption
+screenflow appstore screenshot.png --caption "Find your way, anywhere."
+# → screenshot_iphone-17-pro_appstore.png  (1242×2688)
+
+# Light background (caption auto-switches to black), left-aligned
+screenflow appstore screenshot.png -d iphone-16-pro -c black \
+  --caption "Plan routes in seconds." --align left --bg "#F2F2F7"
+
+# Dark background, long captions wrap automatically
+screenflow appstore screenshot.png --bg "#1C1C1E" \
+  --caption "Discover every hidden corner of your city with confidence"
+
+# Manual line break with \n
+screenflow appstore screenshot.png \
+  --caption "Find your way.\nAnywhere, anytime."
+```
 
 ### Screen recordings & HEIC input
 

@@ -15,6 +15,7 @@ _screenflow() {
       local -a subcommands
       subcommands=(
         'video:Create a 9-second animated marketing video'
+        'appstore:Generate a ready-to-upload App Store screenshot (1242×2688)'
         'devices:List all available devices and their colors'
         'config:Show saved defaults'
         'set-default:Set a default device and color interactively'
@@ -27,6 +28,7 @@ _screenflow() {
     args)
       case $line[1] in
         video)       _screenflow_video ;;
+        appstore)    _screenflow_appstore ;;
         devices|config|set-default|author) ;;
         *)           _screenflow_frame ;;
       esac
@@ -90,6 +92,21 @@ _screenflow_video() {
     '--fps=[frame rate]:fps:(24 30 60 120)' \
     '--mute[drop the audio track (screen recordings only)]' \
     ':screenshot:_files -g "*.png *.jpg *.jpeg *.heic *.heif *.webp *.mp4 *.mov *.m4v"'
+}
+
+_screenflow_appstore() {
+  local device=$(_screenflow_device_arg)
+  local colors=($(_screenflow_colors $device))
+
+  _arguments \
+    '(-o --output)'{-o+,--output=}'[output file path]:output file:_files' \
+    '--caption=[headline text rendered above the device]:caption:' \
+    '--align=[caption alignment]:align:(left center right)' \
+    '--bg=[background color (hex, e.g. #0A84FF)]:color:' \
+    '--jpeg[output as JPEG instead of PNG]' \
+    '(-d --device)'{-d+,--device=}'[device frame]:device:(iphone-17-pro iphone-17 iphone-16-pro iphone-16 iphone-air ipad-pro-11 ipad-pro-13 imac)' \
+    '(-c --color)'{-c+,--color=}'[frame color]:color:('"${colors[*]}"')' \
+    ':screenshot:_files -g "*.png *.jpg *.jpeg *.heic *.heif *.webp"'
 }
 
 _screenflow "$@"
