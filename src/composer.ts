@@ -114,17 +114,19 @@ async function composeVector(
 
 // ── Raster compositing (iPad-style: PNG embedded in SVG) ─────────────────────
 
-function extractEmbeddedPng(svgContent: string): Buffer {
+function extractEmbeddedPng(svgContent: string): Buffer | null {
   const match = svgContent.match(/xlink:href="data:image\/png;base64,([^"]+)"/);
-  if (!match) throw new Error('No embedded PNG found in raster frame SVG');
-  return Buffer.from(match[1], 'base64');
+  return match ? Buffer.from(match[1], 'base64') : null;
 }
 
 async function composeRaster(
   inputPath: string, spec: FrameSpec, frameSvg: string,
   outputPath: string, format: Format,
 ): Promise<void> {
-  const frameBuffer = extractEmbeddedPng(frameSvg);
+  const frameBuffer = extractEmbeddedPng(frameSvg)
+    ?? await sharp(Buffer.from(frameSvg))
+        .resize(spec.canvas.w, spec.canvas.h, { fit: 'fill' })
+        .png().toBuffer();
   const r = spec.cornerRadius ?? 0;
 
   let screenshot = await sharp(inputPath)
@@ -237,13 +239,31 @@ export interface FrameAssets {
   cornerMaskPng: Buffer | null;
 }
 
+// Scale all pixel dimensions of a FrameSpec by a factor (SVG-based frames only).
+function scaleSpec(spec: FrameSpec, factor: number): FrameSpec {
+  const s = (n: number) => Math.round(n * factor);
+  return {
+    ...spec,
+    canvas: { w: s(spec.canvas.w), h: s(spec.canvas.h) },
+    screen: { x: s(spec.screen.x), y: s(spec.screen.y), w: s(spec.screen.w), h: s(spec.screen.h) },
+    ...(spec.cornerRadius !== undefined && { cornerRadius: s(spec.cornerRadius) }),
+    ...(spec.cutoutBleed !== undefined && { cutoutBleed: s(spec.cutoutBleed) }),
+  };
+}
+
 // Builds the static overlay + corner mask once so the video compositing can run
 // in a single ffmpeg pass. The rounded-corner handling mirrors the still
 // pipeline: raster/overlay frames round the screen via `cornerRadius`, vector
 // frames rely on the opaque bezel in the overlay covering the screen corners.
+//
+// videoWidth/videoHeight: native resolution of the recording. SVG-based frames
+// (vector/overlay) are designed at 1× logical-pixel scale and are automatically
+// scaled up to match the recording so the output isn't tiny.
 export async function buildFrameAssets(
   deviceInput: string,
   colorInput = getDefaultColor(deviceInput),
+  videoWidth?: number,
+  videoHeight?: number,
 ): Promise<FrameAssets> {
   const device = resolveDevice(deviceInput);
   const color = resolveColor(device, colorInput);
@@ -252,34 +272,42 @@ export async function buildFrameAssets(
   const framePath = path.join(__dirname, 'frames', device, spec.colors[color]);
   const frameSvg = fs.readFileSync(framePath, 'utf8');
 
-  const overlayPng = spec.frameType === 'raster'
-    ? extractEmbeddedPng(frameSvg)
-    : await sharp(Buffer.from(frameSvg)).png().toBuffer();
+  // Raster frames already embed their overlay at native pixel density.
+  // SVG-based frames (vector/overlay) need to be scaled up to the recording resolution.
+  let effective = spec;
+  if (spec.frameType !== 'raster' && videoWidth && videoHeight) {
+    const factor = Math.max(videoWidth / spec.screen.w, videoHeight / spec.screen.h);
+    if (factor > 1.05) effective = scaleSpec(spec, factor);
+  }
 
-  const r = spec.cornerRadius ?? 0;
+  const overlayPng = spec.frameType === 'raster'
+    ? (extractEmbeddedPng(frameSvg) ?? await sharp(Buffer.from(frameSvg))
+        .resize(effective.canvas.w, effective.canvas.h, { fit: 'fill' })
+        .png().toBuffer())
+    : await sharp(Buffer.from(frameSvg))
+        .resize(effective.canvas.w, effective.canvas.h, { fit: 'fill' })
+        .png().toBuffer();
+
+  const r = effective.cornerRadius ?? 0;
   let cornerMaskPng: Buffer | null = null;
   if (r > 0) {
     cornerMaskPng = await sharp(Buffer.from(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="${spec.screen.w}" height="${spec.screen.h}">` +
-      `<rect width="${spec.screen.w}" height="${spec.screen.h}" fill="black"/>` +
-      `<rect width="${spec.screen.w}" height="${spec.screen.h}" rx="${r}" fill="white"/>` +
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${effective.screen.w}" height="${effective.screen.h}">` +
+      `<rect width="${effective.screen.w}" height="${effective.screen.h}" fill="black"/>` +
+      `<rect width="${effective.screen.w}" height="${effective.screen.h}" rx="${r}" fill="white"/>` +
       `</svg>`,
     )).png().toBuffer();
   } else if (!spec.frameType || spec.frameType === 'vector') {
-    // Vector frames rely on the SVG clip path for stills, but the video pipeline
-    // composites a rasterised overlay PNG — which has transparent corner zones
-    // outside the rounded phone body where the bezel elements don't reach.
-    // Build a luma mask from the actual phone body path so alphamerge can clip
-    // the recording to the correct rounded shape.
     const { phoneBody } = extractScreenMaskPaths(frameSvg);
+    const sf = effective.screen.w / spec.screen.w;
     const maskSvg =
-      `<svg xmlns="http://www.w3.org/2000/svg" width="${spec.screen.w}" height="${spec.screen.h}">` +
-      `<path d="${phoneBody}" transform="translate(${-spec.screen.x},${-spec.screen.y})" fill="white"/>` +
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${effective.screen.w}" height="${effective.screen.h}">` +
+      `<path d="${phoneBody}" transform="scale(${sf}) translate(${-spec.screen.x},${-spec.screen.y})" fill="white"/>` +
       `</svg>`;
     cornerMaskPng = await sharp(Buffer.from(maskSvg)).png().toBuffer();
   }
 
-  return { spec, overlayPng, cornerMaskPng };
+  return { spec: effective, overlayPng, cornerMaskPng };
 }
 
 // Makes the input readable by sharp. PNG/JPG/WebP/TIFF decode natively; HEIC/HEIF

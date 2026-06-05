@@ -55,6 +55,9 @@ screenflow screenshot.png --color deep-blue
 # Cosmic Orange, exported as PNG
 screenflow screenshot.png -c cosmic-orange --png
 
+# Render your screen recording into a static mockup
+screenflow simulator.mov
+
 # iPad Pro 11, Space Gray
 screenflow screenshot.png -d ipad-pro-11 -c space-gray --png
 

@@ -39,10 +39,10 @@ export const FRAMES: Record<string, FrameSpec> = {
     },
   },
   'iphone-16-pro': {
-    canvas: { w: 417, h: 876 },
-    screen: { x: 12, y: 13, w: 393, h: 850 },
-    frameType: 'overlay',
-    cornerRadius: 58,
+    canvas: { w: 1350, h: 2760 },
+    screen: { x: 72, y: 27, w: 1206, h: 2664 },
+    frameType: 'raster',
+    cornerRadius: 90,
     colors: {
       'dessert-titanium': 'dessert-titanium.svg',
       'natural': 'natural.svg',
