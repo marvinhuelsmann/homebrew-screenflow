@@ -67,6 +67,17 @@ Note: `iphone-14-pro` has `cornerRadius: 47` in the registry, but the SVG geomet
 
 **Every time any change is made to this repository, bump the patch version in `package.json` before finishing.** Increment the last number (e.g. `0.2.58` → `0.2.59`). No exceptions — every change ships a new version.
 
+## Git workflow
+
+**Always commit and push to `develop` first.** Never push directly to `master`. Only merge `develop` → `master` when the user explicitly gives the go-ahead.
+
+```bash
+git checkout develop   # work here
+git push origin develop
+# wait for user approval, then:
+git checkout master && git merge develop && git push origin master
+```
+
 ## Release workflow
 
 Bump `"version"` in `package.json`, commit, push to `master`. The **Auto Tag** and Release workflow (`.github/workflows/tag.yml`) reads the version and pushes a `v*` tag automatically. The **Release** workflow (`.github/workflows/release.yml`) then creates the GitHub release and updates `Formula/screenflow.rb` with the new tarball URL and SHA256.
