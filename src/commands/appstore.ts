@@ -105,11 +105,15 @@ export async function appstoreAction(file: string, options: AppStoreOptions): Pr
     let textH = 0;
     if (options.caption && options.caption.trim()) {
       const pangoAlign = align === 'center' ? 'centre' : align;
-      const markup = `<span foreground="${textColor}">${escapeXml(options.caption.trim())}</span>`;
+      // Turn literal "\n" (as typed in the shell) into real line breaks; Pango
+      // honours actual newlines for manual line wrapping.
+      const caption = options.caption.replace(/\\n/g, '\n').trim();
+      const markup = `<span foreground="${textColor}">${escapeXml(caption)}</span>`;
       textBuf = await sharp({
         text: {
           text: markup,
-          font: 'sans-serif Bold 78',
+          // SF Pro Display — Apple's system font, resolved via CoreText on macOS.
+          font: 'SF Pro Display Bold 116',
           rgba: true,
           width: CANVAS_W - 2 * SIDE_MARGIN,
           align: pangoAlign as 'left' | 'centre' | 'right',
