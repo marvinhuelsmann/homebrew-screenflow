@@ -15,7 +15,7 @@ _screenflow() {
       local -a subcommands
       subcommands=(
         'video:Create a 9-second animated marketing video'
-        'appstore:Generate a ready-to-upload App Store screenshot (1290×2796)'
+        'appstore:Generate a ready-to-upload App Store screenshot (1242×2688)'
         'devices:List all available devices and their colors'
         'config:Show saved defaults'
         'set-default:Set a default device and color interactively'

@@ -91,7 +91,7 @@ function buildProgram(): Command {
 
   program
     .command('appstore <file>')
-    .description('Generate a ready-to-upload App Store screenshot (1290×2796) — caption on top, framed device below, on a solid background')
+    .description('Generate a ready-to-upload App Store screenshot (1242×2688) — caption on top, framed device below, on a solid background')
     .option('-o, --output <path>', 'Output file path')
     .option('-d, --device <device>', 'Device frame (e.g. iphone-17-pro)')
     .option('-c, --color <color>', 'Frame color for the chosen device')

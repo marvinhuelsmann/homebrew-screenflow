@@ -18,9 +18,9 @@ interface AppStoreOptions {
   jpeg?: boolean;
 }
 
-// App Store Connect 6.9" portrait (iPhone 16/15 Pro Max) — a mandatory size.
-const CANVAS_W = 1290;
-const CANVAS_H = 2796;
+// App Store Connect 6.5" portrait (iPhone 11 Pro Max / XS Max) — a mandatory size.
+const CANVAS_W = 1242;
+const CANVAS_H = 2688;
 
 // Layout constants (tuned against the 1290×2796 canvas).
 const SIDE_MARGIN   = 96;   // text block left/right inset
@@ -90,7 +90,7 @@ export async function appstoreAction(file: string, options: AppStoreOptions): Pr
     ? path.resolve(options.output)
     : path.join(dir, `${base}_${device}_appstore${outExt}`);
 
-  const composeLabel = `App Store ${bold(fmtName(device))}${dot()}${bold(fmtName(color))}${dot()}${dim('1290×2796')}`;
+  const composeLabel = `App Store ${bold(fmtName(device))}${dot()}${bold(fmtName(color))}${dot()}${dim('1242×2688')}`;
   const s = new Spinner(`${composeLabel}...`);
   s.start();
 
