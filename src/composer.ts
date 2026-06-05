@@ -114,17 +114,19 @@ async function composeVector(
 
 // ── Raster compositing (iPad-style: PNG embedded in SVG) ─────────────────────
 
-function extractEmbeddedPng(svgContent: string): Buffer {
+function extractEmbeddedPng(svgContent: string): Buffer | null {
   const match = svgContent.match(/xlink:href="data:image\/png;base64,([^"]+)"/);
-  if (!match) throw new Error('No embedded PNG found in raster frame SVG');
-  return Buffer.from(match[1], 'base64');
+  return match ? Buffer.from(match[1], 'base64') : null;
 }
 
 async function composeRaster(
   inputPath: string, spec: FrameSpec, frameSvg: string,
   outputPath: string, format: Format,
 ): Promise<void> {
-  const frameBuffer = extractEmbeddedPng(frameSvg);
+  const frameBuffer = extractEmbeddedPng(frameSvg)
+    ?? await sharp(Buffer.from(frameSvg))
+        .resize(spec.canvas.w, spec.canvas.h, { fit: 'fill' })
+        .png().toBuffer();
   const r = spec.cornerRadius ?? 0;
 
   let screenshot = await sharp(inputPath)
@@ -279,7 +281,9 @@ export async function buildFrameAssets(
   }
 
   const overlayPng = spec.frameType === 'raster'
-    ? extractEmbeddedPng(frameSvg)
+    ? (extractEmbeddedPng(frameSvg) ?? await sharp(Buffer.from(frameSvg))
+        .resize(effective.canvas.w, effective.canvas.h, { fit: 'fill' })
+        .png().toBuffer())
     : await sharp(Buffer.from(frameSvg))
         .resize(effective.canvas.w, effective.canvas.h, { fit: 'fill' })
         .png().toBuffer();
