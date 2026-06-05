@@ -45,7 +45,7 @@ function buildProgram(): Command {
     .option('-o, --output <path>', 'Output file path')
     .option('--png', 'Output as PNG instead of SVG (still images only)')
     .option('--jpeg', 'Output as JPEG instead of SVG (still images only)')
-    .option('--mp4', 'Output as MP4 · H.264 on black instead of MOV · ProRes 4444 · Transparent (screen recordings only)')
+    .option('--mp4', 'Output as MP4 · H.264 on black instead of MOV · HEVC · Transparent (screen recordings only)')
     .option('-d, --device <device>', 'Device frame (e.g. iphone-17-pro)')
     .option('-c, --color <color>', 'Frame color for the chosen device')
     .option('--mute', 'Drop the audio track (screen recordings only)')
