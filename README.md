@@ -129,7 +129,7 @@ Output is always `1920 × 1080` H.264 MP4, CRF 12.
 
 ### App Store screenshots
 
-`screenflow appstore <file>` turns a single screenshot into a **ready-to-upload App Store screenshot** at the mandatory **1242 × 2688** (iPhone 6.5") size: a headline caption on top, the framed device below, on a solid background. The caption color is chosen automatically for contrast against the background.
+`screenflow appstore <file>` turns a single screenshot into a **ready-to-upload App Store screenshot** at the mandatory **1242 × 2688** (iPhone 6.5") size: a headline caption on top, the framed device below, on a solid background. The caption is set in **SF Pro Display**, and its color is chosen automatically for contrast against the background. Use `\n` in the caption for manual line breaks (long captions also wrap automatically).
 
 #### App Store options
 
@@ -155,6 +155,10 @@ screenflow appstore screenshot.png -d iphone-16-pro -c black \
 # Dark background, long captions wrap automatically
 screenflow appstore screenshot.png --bg "#1C1C1E" \
   --caption "Discover every hidden corner of your city with confidence"
+
+# Manual line break with \n
+screenflow appstore screenshot.png \
+  --caption "Find your way.\nAnywhere, anytime."
 ```
 
 ### Screen recordings & HEIC input
