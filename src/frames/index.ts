@@ -40,11 +40,10 @@ export const FRAMES: Record<string, FrameSpec> = {
   },
   'iphone-16-pro': {
     canvas: { w: 1350, h: 2760 },
-    screen: { x: 72, y: 27, w: 1206, h: 2664 },
+    screen: { x: 72, y: 69, w: 1206, h: 2622 },
     frameType: 'raster',
-    cornerRadius: 90,
+    cornerRadius: 190,
     colors: {
-      'dessert-titanium': 'dessert-titanium.svg',
       'natural': 'natural.svg',
       'white': 'white.svg',
       'black': 'black.svg',

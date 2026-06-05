@@ -40,7 +40,7 @@ _screenflow_colors() {
   case $device in
     iphone-17-pro)  colors=(cosmic-orange deep-blue silver) ;;
     iphone-17)      colors=(black lavender mist-blue sage white) ;;
-    iphone-16-pro)  colors=(dessert-titanium black natural white) ;;
+    iphone-16-pro)  colors=(black natural white) ;;
     iphone-16)      colors=(black pink teal ultramarine white) ;;
     iphone-air)     colors=(black blue gold white) ;;
     ipad-pro-11)    colors=(silver silver-with-apple-pencil space-gray space-gray-with-apple-pencil) ;;

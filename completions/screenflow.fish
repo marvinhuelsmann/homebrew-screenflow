@@ -45,7 +45,7 @@ complete -c screenflow -n '__fish_seen_subcommand_from video'  -l device -r -a $
 # Colors — scoped per device
 set -l __sf_colors_17pro  'cosmic-orange\t"Cosmic Orange (default)" deep-blue\t"Deep Blue" silver\t"Silver"'
 set -l __sf_colors_17     'black\t"Black" lavender\t"Lavender" mist-blue\t"Mist Blue" sage\t"Sage" white\t"White"'
-set -l __sf_colors_16pro  'dessert-titanium\t"Desert Titanium" black\t"Black" natural\t"Natural" white\t"White"'
+set -l __sf_colors_16pro  'black\t"Black" natural\t"Natural" white\t"White"'
 set -l __sf_colors_16     'black\t"Black" pink\t"Pink" teal\t"Teal" ultramarine\t"Ultramarine" white\t"White"'
 set -l __sf_colors_air    'black\t"Black" blue\t"Blue" gold\t"Gold" white\t"White"'
 set -l __sf_colors_11     'silver\t"Silver" silver-with-apple-pencil\t"Silver + Pencil" space-gray\t"Space Gray" space-gray-with-apple-pencil\t"Space Gray + Pencil"'
