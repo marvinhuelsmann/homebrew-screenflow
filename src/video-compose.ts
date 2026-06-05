@@ -11,8 +11,9 @@ import { FrameSpec } from './frames';
 // ffmpeg input order assumed by the labels below:
 //   [0:v] = screen recording   [1:v] = frame overlay PNG   [2:v] = corner mask (if hasMask)
 //
-// transparent=true keeps an alpha background (for ProRes .mov); false fills the
-// background and rounded-corner cut-outs with black (for H.264 .mp4 / animation).
+// transparent=true keeps an alpha background (for HEVC-with-alpha .mov); false
+// fills the background and rounded-corner cut-outs with black (for H.264 .mp4 /
+// animation).
 export function deviceCompositeChain(opts: {
   spec: FrameSpec;
   fps: number;
@@ -30,7 +31,7 @@ export function deviceCompositeChain(opts: {
   // chain (including `crop`) into 4:2:0 and clamp odd screen widths/heights down
   // to even — breaking the alphamerge size match with the corner mask. We keep
   // compositing in a non-subsampled space so odd sizes survive:
-  //   • Transparent path: RGBA links ([scr] + base) — preserves alpha for ProRes.
+  //   • Transparent path: RGBA links ([scr] + base) — preserves alpha for HEVC.
   //   • Opaque path: overlay `format=yuv444` (4:4:4) — alpha isn't needed and
   //     yuv420p is produced at encode time.
   // fit:'cover', position:'top' — matches the still composer's resize.
@@ -72,7 +73,9 @@ export async function writeFrameInputs(
 
 // Static framing of a screen recording: the device stays still while the screen
 // plays the recording. Output length = recording length. `.mov` keeps a
-// transparent background (ProRes 4444); any other extension renders on black H.264.
+// transparent background (HEVC with alpha — ~90× smaller than ProRes, plays
+// natively in QuickTime/Keynote/Final Cut); any other extension renders on
+// black H.264.
 export async function composeStaticVideo(opts: {
   inputPath: string;
   device: string;
@@ -89,16 +92,19 @@ export async function composeStaticVideo(opts: {
 
   try {
     const chain = deviceCompositeChain({ spec, fps, transparent, hasMask, out: 'comp' });
-    // H.264/yuv420p needs even dimensions; device canvases can be odd (e.g.
-    // iphone-16 1359w, imac 3485h), so pad up to even on the .mp4 path. ProRes
-    // accepts odd sizes, so the transparent .mov path is left untouched.
+    // Both HEVC (yuva420p) and H.264 (yuv420p) need even dimensions; device
+    // canvases can be odd (e.g. iphone-16 1359w, imac 3485h), so pad up to even.
+    // The transparent path pads with transparent black (black@0) to keep alpha.
     const filter = transparent
-      ? chain
+      ? `${chain};[comp]pad=ceil(iw/2)*2:ceil(ih/2)*2:0:0:black@0[outv]`
       : `${chain};[comp]pad=ceil(iw/2)*2:ceil(ih/2)*2:0:0:black,format=yuv420p[outv]`;
-    const vLabel = transparent ? 'comp' : 'outv';
+    const vLabel = 'outv';
 
+    // HEVC with alpha via VideoToolbox: ~90× smaller than ProRes 4444 at
+    // visually identical quality, hardware-encoded, hvc1-tagged so it plays in
+    // QuickTime, Keynote, Final Cut and After Effects.
     const videoCodec = transparent
-      ? ['-c:v', 'prores_ks', '-profile:v', '4444', '-pix_fmt', 'yuva444p10le']
+      ? ['-c:v', 'hevc_videotoolbox', '-alpha_quality', '0.9', '-tag:v', 'hvc1', '-pix_fmt', 'yuva420p']
       : ['-c:v', 'libx264', '-profile:v', 'high', '-pix_fmt', 'yuv420p', '-crf', '18', '-preset', 'slow'];
 
     const audio = (mute || !info.hasAudio)

@@ -54,7 +54,7 @@ export async function frameAction(file: string, options: FrameOptions): Promise<
 
 // Wrap a screen recording in a static device frame: the device stays still, the
 // screen plays the recording, output length = recording length. Defaults to a
-// transparent .mov (ProRes 4444); pass --mp4 for an H.264 clip on black.
+// transparent .mov (HEVC with alpha); pass --mp4 for an H.264 clip on black.
 async function frameVideo(args: {
   inputPath: string;
   base: string;
@@ -67,7 +67,7 @@ async function frameVideo(args: {
 
   if (options.png || options.jpeg) {
     const flag = options.png ? '--png' : '--jpeg';
-    throw new Error(`${flag} requires a still image as input, not a screen recording.\nTo frame a still image use: screenflow <image> ${flag}\nTo frame a recording as video use: screenflow <recording> (default: MOV · ProRes 4444 · Transparent)`);
+    throw new Error(`${flag} requires a still image as input, not a screen recording.\nTo frame a still image use: screenflow <image> ${flag}\nTo frame a recording as video use: screenflow <recording> (default: MOV · HEVC · Transparent)`);
   }
 
   await ensureFfmpeg();
@@ -78,7 +78,7 @@ async function frameVideo(args: {
     ? path.resolve(options.output)
     : path.join(dir, `${base}_${device}_${color}${defaultExt}`);
   const ext = path.extname(outputPath).toLowerCase();
-  const fmtLabel = ext === '.mov' ? 'MOV · ProRes 4444 · Transparent' : 'MP4 · H.264';
+  const fmtLabel = ext === '.mov' ? 'MOV · HEVC · Transparent' : 'MP4 · H.264';
 
   const composeLabel = `Framing ${bold(fmtName(device))}${dot()}${bold(fmtName(color))}${dot()}${dim(fmtLabel)}`;
   const s = new Spinner(`${composeLabel}...`);
