@@ -197,6 +197,42 @@ screenflow shot.heic -d iphone-17 --png
 
 > Note: transparent `.mov` output uses HEVC with alpha (hardware-encoded via VideoToolbox on macOS), keeping files small even for large canvases (iMac, iPad).
 
+## Use it from AI agents (MCP)
+
+screenflow ships an **MCP server** (`screenflow-mcp`) so AI coding agents — **Claude Code, Codex, Cursor, Claude Desktop** — can frame screenshots, build App Store screenshots and wrap recordings for you. Register it once, and the agent picks the right tool automatically whenever you ask it to "put this screenshot in an iPhone mockup" or "make App Store screenshots".
+
+**Tools exposed:** `frame_screenshot`, `frame_recording`, `create_appstore_screenshot`, `list_devices`.
+
+### Claude Code
+
+```bash
+# After `brew install marvinhuelsmann/screenflow/screenflow`
+claude mcp add screenflow -- screenflow-mcp
+```
+
+### Codex
+
+Add to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.screenflow]
+command = "screenflow-mcp"
+```
+
+### Cursor / Claude Desktop
+
+Add to the client's MCP config (`mcpServers`):
+
+```json
+{
+  "mcpServers": {
+    "screenflow": { "command": "screenflow-mcp" }
+  }
+}
+```
+
+> `screenflow-mcp` is installed automatically alongside the `screenflow` CLI (Homebrew or `npm i -g screenflow`). It communicates over stdio and requires no extra setup; ffmpeg is only needed for the recording tool.
+
 ### Supported Devices
 
 | Device | ID | Colors |

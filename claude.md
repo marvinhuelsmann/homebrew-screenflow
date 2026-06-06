@@ -18,6 +18,8 @@ There are no tests and no linter configured.
 
 The CLI entry point is `src/index.ts` (3 lines) → `src/cli.ts` (argument parsing, pre-parse routing) → `src/commands/*.ts` (one file per command).
 
+There is a **second entry point** `src/mcp.ts` (bin `screenflow-mcp`) — an MCP server (stdio) exposing `frame_screenshot`, `frame_recording`, `create_appstore_screenshot`, `list_devices`. It must only call **side-effect-free** core functions (`compose`, `composeStaticVideo`, `renderAppStore`), never the `*Action` command wrappers, because those print to stdout and stdout is reserved for the MCP protocol. `renderAppStore` (in `commands/appstore.ts`) is the pure renderer; `appstoreAction` wraps it with the spinner/logging. Uses `zod` v3 (v4 breaks the SDK's schema conversion).
+
 ### Frame registry — single source of truth
 
 `src/frames/index.ts` holds the `FRAMES` object. Every device entry declares:

@@ -61,38 +61,38 @@ function escapeXml(s: string): string {
     .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 }
 
-export async function appstoreAction(file: string, options: AppStoreOptions): Promise<void> {
-  const config = new Config();
-  const device = options.device ?? config.device ?? DEFAULT_DEVICE;
-  const color = options.color
-    ?? (!options.device && config.color && hasFrameColor(device, config.color)
-      ? config.color
-      : getDefaultColor(device));
+// Canvas dimensions of an App Store screenshot — exported for callers (MCP).
+export const APPSTORE_SIZE = { w: CANVAS_W, h: CANVAS_H };
 
-  const inputPath = path.resolve(file);
+export interface RenderAppStoreOptions {
+  inputPath: string;     // absolute path to a still screenshot
+  device: string;        // resolved device id
+  color: string;         // resolved color
+  caption?: string;      // headline ("\n" → line break)
+  align?: Align;         // default 'center'
+  bg?: string;           // hex color, default '#0A84FF'
+  outputPath: string;    // absolute output path
+  jpeg?: boolean;        // JPEG instead of PNG
+}
+
+// Pure renderer: composes the App Store screenshot and writes it to disk.
+// Performs no console output, so it is safe to call from the MCP server (which
+// owns stdout for the protocol). Throws on invalid input.
+export async function renderAppStore(opts: RenderAppStoreOptions): Promise<{ outputPath: string; width: number; height: number }> {
+  const { inputPath, device, color, outputPath } = opts;
+
   if (detectInputKind(inputPath) === 'video') {
     throw new Error('App Store screenshots are still images — pass a screenshot (PNG/JPG/HEIC), not a screen recording.');
   }
 
-  const align = (options.align ?? 'center').toLowerCase() as Align;
+  const align = (opts.align ?? 'center').toLowerCase() as Align;
   if (!['left', 'center', 'right'].includes(align)) {
-    throw new Error(`--align must be left, center, or right (got "${options.align}")`);
+    throw new Error(`align must be left, center, or right (got "${opts.align}")`);
   }
 
-  const bg = parseHexColor(options.bg ?? '#0A84FF');
+  const bg = parseHexColor(opts.bg ?? '#0A84FF');
   const textColor = contrastText(bg);
-
-  const base = path.basename(inputPath, path.extname(inputPath));
-  const dir = path.dirname(inputPath);
-  const jpeg = options.jpeg || /\.jpe?g$/i.test(options.output ?? '');
-  const outExt = jpeg ? '.jpg' : '.png';
-  const outputPath = options.output
-    ? path.resolve(options.output)
-    : path.join(dir, `${base}_${device}_appstore${outExt}`);
-
-  const composeLabel = `App Store ${bold(fmtName(device))}${dot()}${bold(fmtName(color))}${dot()}${dim('1242×2688')}`;
-  const s = new Spinner(`${composeLabel}...`);
-  s.start();
+  const jpeg = opts.jpeg || /\.jpe?g$/i.test(outputPath);
 
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'screenflow-'));
   try {
@@ -103,11 +103,11 @@ export async function appstoreAction(file: string, options: AppStoreOptions): Pr
     // 2. Render the caption (auto-contrast, wrapped, aligned) — if provided.
     let textBuf: Buffer | null = null;
     let textH = 0;
-    if (options.caption && options.caption.trim()) {
+    if (opts.caption && opts.caption.trim()) {
       const pangoAlign = align === 'center' ? 'centre' : align;
       // Turn literal "\n" (as typed in the shell) into real line breaks; Pango
       // honours actual newlines for manual line wrapping.
-      const caption = options.caption.replace(/\\n/g, '\n').trim();
+      const caption = opts.caption.replace(/\\n/g, '\n').trim();
       const markup = `<span foreground="${textColor}">${escapeXml(caption)}</span>`;
       textBuf = await sharp({
         text: {
@@ -168,6 +168,36 @@ export async function appstoreAction(file: string, options: AppStoreOptions): Pr
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 
+  return { outputPath, width: CANVAS_W, height: CANVAS_H };
+}
+
+export async function appstoreAction(file: string, options: AppStoreOptions): Promise<void> {
+  const config = new Config();
+  const device = options.device ?? config.device ?? DEFAULT_DEVICE;
+  const color = options.color
+    ?? (!options.device && config.color && hasFrameColor(device, config.color)
+      ? config.color
+      : getDefaultColor(device));
+
+  const inputPath = path.resolve(file);
+  const align = (options.align ?? 'center').toLowerCase() as Align;
+  const base = path.basename(inputPath, path.extname(inputPath));
+  const dir = path.dirname(inputPath);
+  const jpeg = options.jpeg || /\.jpe?g$/i.test(options.output ?? '');
+  const outExt = jpeg ? '.jpg' : '.png';
+  const outputPath = options.output
+    ? path.resolve(options.output)
+    : path.join(dir, `${base}_${device}_appstore${outExt}`);
+
+  const composeLabel = `App Store ${bold(fmtName(device))}${dot()}${bold(fmtName(color))}${dot()}${dim('1242×2688')}`;
+  const s = new Spinner(`${composeLabel}...`);
+  s.start();
+  try {
+    await renderAppStore({ inputPath, device, color, caption: options.caption, align, bg: options.bg, outputPath, jpeg });
+  } catch (err) {
+    s.stop('');
+    throw err;
+  }
   s.stop(`${cyan('✦')} ${composeLabel}`);
   console.log(`${green('✓')} Saved ${dim('→')} ${bold(path.basename(outputPath))}`);
 }

@@ -1,6 +1,6 @@
 {
   "name": "screenflow",
-  "version": "0.3.45",
+  "version": "0.3.46",
   "description": "CLI tool to create beautiful mockup device screenshots",
   "homepage": "https://github.com/marvinhuelsmann/screenflow",
   "repository": {
@@ -13,7 +13,8 @@
   },
   "main": "dist/index.js",
   "bin": {
-    "screenflow": "dist/index.js"
+    "screenflow": "dist/index.js",
+    "screenflow-mcp": "dist/mcp.js"
   },
   "scripts": {
     "build": "tsc && cp -r src/frames/iphone-17-pro dist/frames/ && cp -r src/frames/ipad-pro-11 dist/frames/ && cp -r src/frames/ipad-pro-13 dist/frames/ && cp -r src/frames/iphone-16-pro dist/frames/ && cp -r src/frames/iphone-air dist/frames/ && cp -r src/frames/iphone-17 dist/frames/ && cp -r src/frames/iphone-16 dist/frames/ && cp -r src/frames/imac dist/frames/ && cp -r src/frames/apple-watch-ultra dist/frames/ && cp -r src/frames/apple-watch-series-11 dist/frames/",
@@ -25,8 +26,10 @@
   },
   "dependencies": {
     "@inquirer/prompts": "^8.4.3",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "commander": "^12.0.0",
-    "sharp": "^0.33.0"
+    "sharp": "^0.33.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

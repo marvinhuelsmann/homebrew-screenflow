@@ -17,6 +17,10 @@ class Screenflow < Formula
       #!/bin/sh
       exec node "#{libexec}/dist/index.js" "$@"
     SH
+    (bin/"screenflow-mcp").write <<~SH
+      #!/bin/sh
+      exec node "#{libexec}/dist/mcp.js" "$@"
+    SH
   end
 
   test do
