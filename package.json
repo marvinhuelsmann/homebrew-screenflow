@@ -1,6 +1,6 @@
 {
   "name": "@marvinhuelsmann/screenflow",
-  "version": "0.4.16",
+  "version": "0.4.17",
   "description": "CLI tool to create beautiful mockup device screenshots",
   "homepage": "https://github.com/marvinhuelsmann/screenflow",
   "repository": {
