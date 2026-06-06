@@ -73,7 +73,7 @@ function buildProgram(): Command {
     .option('-s, --style <style>', `Animation style: ${VALID_STYLES.join(' | ')}`, 'zoom-in')
     .option('-t, --tilt <degrees>', 'Perspective tilt downward in degrees (0–45)', '0')
     .option('--fps <fps>', 'Frame rate: 24, 30, 60, or 120', '60')
-    .option('--duration <seconds>', 'Animation length in seconds (1–60); ignored for screen recordings', '9')
+    .option('--duration <seconds>', 'Clip length in seconds (1–60); for recordings it trims to this length (capped to the recording)', '9')
     .option('--mute', 'Drop the audio track when the input is a screen recording')
     .action(async (file: string, options) => {
       if (!VALID_STYLES.includes(options.style)) {

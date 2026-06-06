@@ -84,7 +84,7 @@ screenflow devices
 | Option | Short | Description |
 |---|---|---|
 | `--style <style>` | `-s` | Animation style (default: `zoom-in`) |
-| `--duration <seconds>` | | Animation length in seconds, 1–60 (default: `9`) |
+| `--duration <seconds>` | | Clip length in seconds, 1–60 (default: `9`). For a still it's the animation length; for a recording it trims the clip (capped to the recording's length) |
 | `--tilt <degrees>` | `-t` | Perspective tilt downward in degrees, 0–45 (default: `0`) |
 | `--fps <fps>` | | Frame rate: 24, 30, 60, or 120 (default: `60`) |
 | `--device <device>` | `-d` | Device frame |
@@ -170,7 +170,7 @@ The commands are the same — just hand them a **screen recording** (`.mp4`, `.m
 | **Still image** (PNG/JPG/HEIC) | Static framed image (SVG/PNG/JPEG) | Animated marketing clip (`--duration` seconds) |
 | **Screen recording** (MP4/MOV/…) | Device stays still, the **screen plays the recording** | Camera animation (zoom/pan/tilt) runs **while the screen plays** |
 
-For a screen recording the output is **always a video whose length matches the recording**. `--duration` is therefore ignored for the `video` command, and `--png`/`--jpeg` don't apply to the default command.
+For a screen recording the output length **defaults to the recording length**. With the `video` command you can pass `--duration` to trim the clip shorter (it's capped to the recording's own length — a recording can't be extended). `--png`/`--jpeg` don't apply to the default command.
 
 ```bash
 # Static framing of a screen recording → transparent .mov (HEVC with alpha), audio kept

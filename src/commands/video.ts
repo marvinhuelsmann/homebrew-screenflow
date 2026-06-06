@@ -129,10 +129,17 @@ export async function videoAction(file: string, options: VideoOptions): Promise<
     : path.join(dir, `${base}_${device}_${color}.mp4`);
 
   if (detectInputKind(inputPath) === 'video') {
+    // For a recording, --duration trims the clip (capped to the recording's own
+    // length). Left unset, the full recording plays. We treat the value as
+    // "explicitly set" only when it differs from the default.
+    let duration: number | undefined;
     if (options.duration !== undefined && options.duration !== String(DEFAULT_DURATION)) {
-      console.log(`${dim('·')} --duration is ignored for screen recordings — the clip matches the recording length.`);
+      duration = parseFloat(options.duration);
+      if (isNaN(duration) || duration < 1 || duration > 60) {
+        throw new Error('--duration must be a number between 1 and 60');
+      }
     }
-    await animateRecording({ inputPath, outputPath, device, color, style, tilt, fps, h264Level, mute: Boolean(options.mute) });
+    await animateRecording({ inputPath, outputPath, device, color, style, tilt, fps, h264Level, mute: Boolean(options.mute), duration });
     return;
   }
 
@@ -218,15 +225,24 @@ async function animateStill(args: {
 }
 
 // New behaviour: the screen recording plays live inside the device while the
-// camera move runs. Clip length = recording length (overrides --duration).
+// camera move runs. Clip length = full recording, or --duration if given
+// (capped to the recording's own length — a recording can't be extended).
 async function animateRecording(args: {
   inputPath: string; outputPath: string; device: string; color: string;
   style: VideoStyle; tilt: number; fps: number; h264Level: string; mute: boolean;
+  duration?: number;
 }): Promise<void> {
   const { inputPath, outputPath, device, color, style, tilt, fps, h264Level, mute } = args;
 
   const info = probeVideo(inputPath);
-  const duration = info.durationSec;
+  let duration = info.durationSec;
+  if (args.duration !== undefined) {
+    if (args.duration > info.durationSec) {
+      console.log(`${dim('·')} --duration ${args.duration}s exceeds the recording (${info.durationSec.toFixed(1)}s) — using the full length.`);
+    } else {
+      duration = args.duration;
+    }
+  }
 
   const { tmpDir, inputArgs, hasMask, spec } = await writeFrameInputs(device, color, fps, info);
 
