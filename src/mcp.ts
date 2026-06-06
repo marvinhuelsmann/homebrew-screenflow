@@ -8,6 +8,7 @@
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
+import sharp from 'sharp';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
@@ -90,14 +91,25 @@ async function resolveInput(opts: {
   );
 }
 
-// Read a produced still and return it as inline MCP content: an image block for
-// PNG/JPEG (so the agent receives the bytes even without a shared filesystem),
-// or text for SVG.
-function stillContent(filePath: string, fmt: Format): ContentItem {
+// Return a produced still as inline MCP content. PNG/JPEG are downscaled to a
+// max long edge (default 1568px — the size vision models use anyway) so the
+// response stays small and fast; the full-resolution file is still written to
+// output_path. SVG is returned as text. maxPx = 0 keeps the original size.
+async function stillContent(filePath: string, fmt: Format, maxPx = 1568): Promise<ContentItem> {
   if (fmt === 'svg') return { type: 'text', text: fs.readFileSync(filePath, 'utf8') };
+
+  let img = sharp(filePath);
+  if (maxPx > 0) {
+    const meta = await img.metadata();
+    const long = Math.max(meta.width ?? 0, meta.height ?? 0);
+    if (long > maxPx) img = img.resize({ width: maxPx, height: maxPx, fit: 'inside' });
+  }
+  const buf = fmt === 'jpeg'
+    ? await img.jpeg({ quality: 85 }).toBuffer()
+    : await img.png({ compressionLevel: 9 }).toBuffer();
   return {
     type: 'image',
-    data: fs.readFileSync(filePath).toString('base64'),
+    data: buf.toString('base64'),
     mimeType: fmt === 'jpeg' ? 'image/jpeg' : 'image/png',
   };
 }
@@ -141,20 +153,20 @@ tool(
   {
     title: 'Frame a screenshot in a device mockup',
     description:
-      'Wrap a still screenshot (PNG/JPG/HEIC) in a pixel-perfect device frame (iPhone, iPad, iMac, Apple Watch). The framed image is returned INLINE in the response (no need to read any output file). ' +
-      'HOW TO PASS THE IMAGE — pick one: (1) input_base64 = the file\'s raw bytes base64-encoded — ALWAYS works, use this for attached/uploaded images or when you have the bytes from a read tool; (2) input_url = a public http(s) URL; (3) input_path = an EXISTING file on the user\'s machine. ' +
-      'Never invent a path like /mnt/... or /uploads/... — if you do not have a real local path, use input_base64.',
+      'Wrap a still screenshot (PNG/JPG/HEIC) in a pixel-perfect device frame (iPhone, iPad, iMac, Apple Watch). The framed image is returned INLINE (downscaled preview; full resolution goes to output_path). ' +
+      'HOW TO PASS THE IMAGE — in order of preference: (1) input_path = path to a real EXISTING file on the machine running this server — FASTEST, use this whenever you have a real local path (e.g. you are an agent on the same computer); (2) input_url = a public http(s) URL the server downloads; (3) input_base64 = the raw bytes base64-encoded — works anywhere but is SLOW and expensive for files over ~500 KB (you must emit the whole blob), so only use it when no path or URL is available. Never invent a path you have not verified.',
     inputSchema: {
-      input_base64: z.string().optional().describe('The screenshot bytes, base64-encoded (data: URI prefix OK). Preferred — works in any environment.'),
-      input_url: z.string().optional().describe('Public http(s) URL of the screenshot; the server downloads it.'),
-      input_path: z.string().optional().describe('Path to an EXISTING screenshot on the machine running this server. Only if you have a real path.'),
+      input_path: z.string().optional().describe('Path to a real EXISTING screenshot on the machine running this server. Fastest — prefer this when you have a real local path.'),
+      input_url: z.string().optional().describe('Public http(s) URL of the screenshot; the server downloads it. Fast.'),
+      input_base64: z.string().optional().describe('The screenshot bytes, base64-encoded (data: URI prefix OK). Works anywhere but SLOW for large files — last resort.'),
       device: z.string().optional().describe(`Device frame id (default ${DEFAULT_DEVICE}). Use list_devices to see options.`),
       color: z.string().optional().describe('Frame color for the device (default: first color of the device).'),
       format: z.enum(['png', 'svg', 'jpeg']).optional().describe('Output format (default png).'),
-      output_path: z.string().optional().describe('Optional path to ALSO save the result on the server machine.'),
+      output_path: z.string().optional().describe('Optional path to save the FULL-resolution result on the server machine.'),
+      inline_max_px: z.number().optional().describe('Max long edge of the inline preview image (default 1568; 0 = full resolution inline).'),
     },
   },
-  async ({ input_base64, input_url, input_path, device, color, format, output_path }) => {
+  async ({ input_base64, input_url, input_path, device, color, format, output_path, inline_max_px }) => {
     let input: { path: string; cleanup: () => void; inline: boolean } | undefined;
     let outTmp: string | undefined;
     try {
@@ -178,7 +190,7 @@ tool(
       return {
         content: [
           { type: 'text', text: `${saved}Framed ${resolved.device} · ${resolved.color} · ${fmt.toUpperCase()}.` },
-          stillContent(outputPath, fmt),
+          await stillContent(outputPath, fmt, inline_max_px ?? 1568),
         ],
       };
     } catch (err) {
@@ -268,22 +280,23 @@ tool(
   {
     title: 'Create an App Store screenshot',
     description:
-      `Turn a screenshot into a ready-to-upload App Store screenshot at the mandatory ${APPSTORE_SIZE.w}×${APPSTORE_SIZE.h} (iPhone 6.5") size: a headline caption on top (SF Pro Display, auto-contrast color), the framed device below, on a solid background. The result is returned INLINE. ` +
-      'HOW TO PASS THE IMAGE — pick one: input_base64 (raw bytes base64-encoded — use for attached/uploaded images), input_url (public URL), or input_path (an EXISTING local file). Never invent a path.',
+      `Turn a screenshot into a ready-to-upload App Store screenshot at the mandatory ${APPSTORE_SIZE.w}×${APPSTORE_SIZE.h} (iPhone 6.5") size: a headline caption on top (SF Pro Display, auto-contrast color), the framed device below, on a solid background. The result is returned INLINE (downscaled preview; full resolution goes to output_path). ` +
+      'HOW TO PASS THE IMAGE — in order of preference: input_path (a real EXISTING local file — FASTEST), input_url (public URL), or input_base64 (raw bytes — works anywhere but SLOW for large files, last resort). Never invent a path.',
     inputSchema: {
-      input_base64: z.string().optional().describe('The screenshot bytes, base64-encoded (data: URI prefix OK). Preferred — works in any environment.'),
-      input_url: z.string().optional().describe('Public http(s) URL of the screenshot; the server downloads it.'),
-      input_path: z.string().optional().describe('Path to an EXISTING screenshot on the server machine. Only if you have a real path.'),
+      input_path: z.string().optional().describe('Path to a real EXISTING screenshot on the server machine. Fastest — prefer this.'),
+      input_url: z.string().optional().describe('Public http(s) URL of the screenshot; the server downloads it. Fast.'),
+      input_base64: z.string().optional().describe('The screenshot bytes, base64-encoded (data: URI prefix OK). Works anywhere but SLOW for large files — last resort.'),
       caption: z.string().optional().describe('Headline text above the device. Use "\\n" for a manual line break.'),
       align: z.enum(['left', 'center', 'right']).optional().describe('Caption alignment (default center).'),
       bg: z.string().optional().describe('Background color as hex, e.g. "#0A84FF" (default #0A84FF).'),
       device: z.string().optional().describe(`Device frame id (default ${DEFAULT_DEVICE}).`),
       color: z.string().optional().describe('Frame color for the device.'),
       jpeg: z.boolean().optional().describe('Output JPEG instead of PNG (default false).'),
-      output_path: z.string().optional().describe('Optional path to ALSO save the result on the server machine.'),
+      output_path: z.string().optional().describe('Optional path to save the FULL-resolution result on the server machine.'),
+      inline_max_px: z.number().optional().describe('Max long edge of the inline preview (default 1568; 0 = full resolution inline).'),
     },
   },
-  async ({ input_base64, input_url, input_path, caption, align, bg, device, color, jpeg, output_path }) => {
+  async ({ input_base64, input_url, input_path, caption, align, bg, device, color, jpeg, output_path, inline_max_px }) => {
     let input: { path: string; cleanup: () => void; inline: boolean } | undefined;
     let outTmp: string | undefined;
     try {
@@ -304,7 +317,7 @@ tool(
       return {
         content: [
           { type: 'text', text: `${saved}App Store screenshot ${res.width}×${res.height} (${resolved.device} · ${resolved.color}).` },
-          stillContent(outputPath, jpeg ? 'jpeg' : 'png'),
+          await stillContent(outputPath, jpeg ? 'jpeg' : 'png', inline_max_px ?? 1568),
         ],
       };
     } catch (err) {
