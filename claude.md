@@ -82,7 +82,7 @@ git checkout master && git merge develop && git push origin master
 
 ## Release workflow
 
-Bump `"version"` in `package.json`, commit, push to `master`. The **Auto Tag** and Release workflow (`.github/workflows/tag.yml`) reads the version and pushes a `v*` tag automatically. The **Release** workflow (`.github/workflows/release.yml`) then creates the GitHub release and updates `Formula/screenflow.rb` with the new tarball URL and SHA256. The **npm publish** workflow (`.github/workflows/npm-publish.yml`) fires on the `v*` tag and runs `npm publish` (needs an `NPM_TOKEN` repo secret).
+Bump `"version"` in `package.json`, commit, push to `master`. The **Auto Tag** and Release workflow (`.github/workflows/tag.yml`) reads the version and pushes a `v*` tag automatically. The **Release** workflow (`.github/workflows/release.yml`) then creates the GitHub release and updates `Formula/screenflow.rb` with the new tarball URL and SHA256. The **npm publish** workflow (`.github/workflows/npm-publish.yml`) fires on the `v*` tag and runs `npm publish` (needs an `NPM` repo secret).
 
 The source code and Homebrew formula live in the same repo (`homebrew-screenflow`). `brew tap marvinhuelsmann/screenflow` resolves to this repo because Homebrew prepends `homebrew-` to tap repo names.
 

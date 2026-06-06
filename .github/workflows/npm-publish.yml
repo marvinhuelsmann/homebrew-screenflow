@@ -3,8 +3,8 @@ name: npm publish (manual)
 # Manual "publish current version to npm" button. Automatic publishing happens
 # in the Release pipeline (release.yml → publish job); this is a fallback you can
 # run from the Actions tab — e.g. to publish a version whose auto-publish failed
-# (such as the first run before NPM_TOKEN was set).
-# Requires an NPM_TOKEN repository secret (npm "Automation" classic token).
+# (such as the first run before NPM was set).
+# Requires an NPM repository secret (npm "Automation" classic token).
 
 on:
   workflow_dispatch:
@@ -30,4 +30,4 @@ jobs:
       - name: Publish to npm
         run: npm publish
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM }}
