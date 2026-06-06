@@ -28,6 +28,7 @@ screenflow screenshot.png
 | `screenflow <file>` | Frame a screenshot (default) |
 | `screenflow video <file>` | Create an animated marketing video |
 | `screenflow appstore <file>` | Generate a ready-to-upload App Store screenshot |
+| `screenflow mcp install` | Register the MCP server with your AI agents (auto-runs on install) |
 | `screenflow devices` | List all available devices and their colors |
 | `screenflow config` | Show your saved defaults |
 | `screenflow set-default` | Set a default device and color interactively |
@@ -84,7 +85,7 @@ screenflow devices
 | Option | Short | Description |
 |---|---|---|
 | `--style <style>` | `-s` | Animation style (default: `zoom-in`) |
-| `--duration <seconds>` | | Animation length in seconds, 1–60 (default: `9`) |
+| `--duration <seconds>` | | Clip length in seconds, 1–60 (default: `9`). For a still it's the animation length; for a recording it trims the clip (capped to the recording's length) |
 | `--tilt <degrees>` | `-t` | Perspective tilt downward in degrees, 0–45 (default: `0`) |
 | `--fps <fps>` | | Frame rate: 24, 30, 60, or 120 (default: `60`) |
 | `--device <device>` | `-d` | Device frame |
@@ -170,7 +171,7 @@ The commands are the same — just hand them a **screen recording** (`.mp4`, `.m
 | **Still image** (PNG/JPG/HEIC) | Static framed image (SVG/PNG/JPEG) | Animated marketing clip (`--duration` seconds) |
 | **Screen recording** (MP4/MOV/…) | Device stays still, the **screen plays the recording** | Camera animation (zoom/pan/tilt) runs **while the screen plays** |
 
-For a screen recording the output is **always a video whose length matches the recording**. `--duration` is therefore ignored for the `video` command, and `--png`/`--jpeg` don't apply to the default command.
+For a screen recording the output length **defaults to the recording length**. With the `video` command you can pass `--duration` to trim the clip shorter (it's capped to the recording's own length — a recording can't be extended). `--png`/`--jpeg` don't apply to the default command.
 
 ```bash
 # Static framing of a screen recording → transparent .mov (HEVC with alpha), audio kept
@@ -196,6 +197,50 @@ screenflow shot.heic -d iphone-17 --png
 - Audio from the recording is kept by default; use `--mute` to strip it.
 
 > Note: transparent `.mov` output uses HEVC with alpha (hardware-encoded via VideoToolbox on macOS), keeping files small even for large canvases (iMac, iPad).
+
+## Use it from AI agents (MCP)
+
+screenflow ships an **MCP server** (`screenflow-mcp`) so AI coding agents — **Claude Code, Codex, Cursor, Claude Desktop** — can frame screenshots, build App Store screenshots and wrap recordings for you. Ask the agent to "put this screenshot in an iPhone mockup" or "make App Store screenshots" and it picks the right tool automatically.
+
+**Tools exposed:** `frame_screenshot`, `frame_recording`, `create_appstore_screenshot`, `list_devices`.
+
+### Zero-config setup
+
+Installing the CLI **automatically registers the MCP server** with every AI agent it finds on your machine — no manual steps:
+
+```bash
+brew install marvinhuelsmann/screenflow/screenflow   # or: npm i -g screenflow
+```
+
+That's it. Restart your agent and ask it to frame a screenshot. Re-run the registration anytime (e.g. after installing a new agent):
+
+```bash
+screenflow mcp install              # register with all detected agents
+screenflow mcp install --dry-run    # preview what it would change
+screenflow mcp uninstall            # remove the registration everywhere
+```
+
+### Manual setup (optional)
+
+If you'd rather wire it up by hand:
+
+```bash
+# Claude Code
+claude mcp add screenflow -- screenflow-mcp
+```
+
+```toml
+# Codex — ~/.codex/config.toml
+[mcp_servers.screenflow]
+command = "screenflow-mcp"
+```
+
+```json
+// Cursor / Claude Desktop — mcpServers
+{ "mcpServers": { "screenflow": { "command": "screenflow-mcp" } } }
+```
+
+> The server communicates over stdio and needs no extra setup; ffmpeg is only required for the recording tool.
 
 ### Supported Devices
 

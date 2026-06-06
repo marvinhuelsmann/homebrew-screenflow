@@ -16,6 +16,7 @@ _screenflow() {
       subcommands=(
         'video:Create a 9-second animated marketing video'
         'appstore:Generate a ready-to-upload App Store screenshot (1242×2688)'
+        'mcp:Manage the MCP server for AI agents (install/uninstall)'
         'devices:List all available devices and their colors'
         'config:Show saved defaults'
         'set-default:Set a default device and color interactively'
@@ -29,6 +30,7 @@ _screenflow() {
       case $line[1] in
         video)       _screenflow_video ;;
         appstore)    _screenflow_appstore ;;
+        mcp)         _values 'mcp subcommand' 'install[Register with detected AI agents]' 'uninstall[Remove the registration]' ;;
         devices|config|set-default|author) ;;
         *)           _screenflow_frame ;;
       esac

@@ -3,6 +3,7 @@ import { version } from '../package.json';
 import { frameAction } from './commands/frame';
 import { videoAction } from './commands/video';
 import { appstoreAction } from './commands/appstore';
+import { mcpInstallAction, mcpUninstallAction } from './commands/mcpSetup';
 import { setDefaultAction } from './commands/setDefault';
 import { devicesAction } from './commands/devices';
 import { showConfigAction } from './commands/showConfig';
@@ -73,7 +74,7 @@ function buildProgram(): Command {
     .option('-s, --style <style>', `Animation style: ${VALID_STYLES.join(' | ')}`, 'zoom-in')
     .option('-t, --tilt <degrees>', 'Perspective tilt downward in degrees (0–45)', '0')
     .option('--fps <fps>', 'Frame rate: 24, 30, 60, or 120', '60')
-    .option('--duration <seconds>', 'Animation length in seconds (1–60); ignored for screen recordings', '9')
+    .option('--duration <seconds>', 'Clip length in seconds (1–60); for recordings it trims to this length (capped to the recording)', '9')
     .option('--mute', 'Drop the audio track when the input is a screen recording')
     .action(async (file: string, options) => {
       if (!VALID_STYLES.includes(options.style)) {
@@ -130,6 +131,36 @@ function buildProgram(): Command {
     .command('author')
     .description('About the author')
     .action(authorAction);
+
+  const mcp = program
+    .command('mcp')
+    .description('Manage the screenflow MCP server for AI agents (Claude Code, Codex, Cursor, Claude Desktop)');
+
+  mcp
+    .command('install')
+    .description('Register the MCP server with every AI agent detected on this machine')
+    .option('--dry-run', 'Show what would change without writing anything')
+    .action(async (options) => {
+      try {
+        await mcpInstallAction({ dryRun: Boolean(options.dryRun) });
+      } catch (err) {
+        console.error(`\nError: ${err instanceof Error ? err.message : String(err)}`);
+        process.exit(1);
+      }
+    });
+
+  mcp
+    .command('uninstall')
+    .description('Remove the MCP server registration from all AI agents')
+    .option('--dry-run', 'Show what would change without writing anything')
+    .action(async (options) => {
+      try {
+        await mcpUninstallAction({ dryRun: Boolean(options.dryRun) });
+      } catch (err) {
+        console.error(`\nError: ${err instanceof Error ? err.message : String(err)}`);
+        process.exit(1);
+      }
+    });
 
   return program;
 }

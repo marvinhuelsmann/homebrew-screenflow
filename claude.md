@@ -18,6 +18,8 @@ There are no tests and no linter configured.
 
 The CLI entry point is `src/index.ts` (3 lines) → `src/cli.ts` (argument parsing, pre-parse routing) → `src/commands/*.ts` (one file per command).
 
+There is a **second entry point** `src/mcp.ts` (bin `screenflow-mcp`) — an MCP server (stdio) exposing `frame_screenshot`, `frame_recording`, `create_appstore_screenshot`, `list_devices`. It must only call **side-effect-free** core functions (`compose`, `composeStaticVideo`, `renderAppStore`), never the `*Action` command wrappers, because those print to stdout and stdout is reserved for the MCP protocol. `renderAppStore` (in `commands/appstore.ts`) is the pure renderer; `appstoreAction` wraps it with the spinner/logging. Uses `zod` v3 (v4 breaks the SDK's schema conversion).
+
 ### Frame registry — single source of truth
 
 `src/frames/index.ts` holds the `FRAMES` object. Every device entry declares:
@@ -80,6 +82,12 @@ git checkout master && git merge develop && git push origin master
 
 ## Release workflow
 
-Bump `"version"` in `package.json`, commit, push to `master`. The **Auto Tag** and Release workflow (`.github/workflows/tag.yml`) reads the version and pushes a `v*` tag automatically. The **Release** workflow (`.github/workflows/release.yml`) then creates the GitHub release and updates `Formula/screenflow.rb` with the new tarball URL and SHA256.
+Bump `"version"` in `package.json`, commit, push to `master`. The **Auto Tag** and Release workflow (`.github/workflows/tag.yml`) reads the version and pushes a `v*` tag automatically. The **Release** workflow (`.github/workflows/release.yml`) then creates the GitHub release and updates `Formula/screenflow.rb` with the new tarball URL and SHA256. The **npm publish** workflow (`.github/workflows/npm-publish.yml`) fires on the `v*` tag and runs `npm publish` (needs an `NPM_TOKEN` repo secret).
 
 The source code and Homebrew formula live in the same repo (`homebrew-screenflow`). `brew tap marvinhuelsmann/screenflow` resolves to this repo because Homebrew prepends `homebrew-` to tap repo names.
+
+### Distribution & MCP auto-registration
+
+npm publish requires the `files` whitelist in `package.json` (it overrides the gitignored `dist/`); without it the published package would ship no `dist/`. Both `screenflow` and `screenflow-mcp` bins point into `dist/`.
+
+Installing the CLI auto-registers the MCP server with detected AI agents: the npm `postinstall` script (`scripts/postinstall.js`) runs `mcpInstallAction` **only on global installs** (`npm_config_global === 'true'`, so dev/CI installs are a no-op), and the Homebrew formula's `post_install` runs `screenflow mcp install`. The worker lives in `src/commands/mcpSetup.ts` (Claude Code via the `claude` CLI; Codex/Cursor/Claude Desktop via their config files) — idempotent and never throws.
