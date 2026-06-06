@@ -45,15 +45,18 @@ type ContentItem =
 const ok = (text: string) => ({ content: [{ type: 'text' as const, text }] });
 const fail = (text: string) => ({ content: [{ type: 'text' as const, text }], isError: true });
 
-// Resolve an input given EITHER inline base64 data OR a filesystem path. base64
-// makes the tool work across environment boundaries (sandboxed/containerised
-// agents whose filesystem the MCP server can't see) — the data travels in the
-// call instead of relying on a shared path.
-function resolveInput(
-  inputPath: string | undefined,
-  inputBase64: string | undefined,
-  ext: string,
-): { path: string; cleanup: () => void; inline: boolean } {
+// Resolve an input given ONE of: inline base64 data, a URL, or a filesystem
+// path. base64/URL make the tool work across environment boundaries (sandboxed
+// or containerised agents whose filesystem the MCP server can't see) — the data
+// travels in the call instead of relying on a shared path.
+async function resolveInput(opts: {
+  inputBase64?: string;
+  inputUrl?: string;
+  inputPath?: string;
+  ext: string;
+}): Promise<{ path: string; cleanup: () => void; inline: boolean }> {
+  const { inputBase64, inputUrl, inputPath, ext } = opts;
+
   if (inputBase64) {
     const b64 = inputBase64.replace(/^data:[^;]+;base64,/, '');
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'screenflow-in-'));
@@ -61,10 +64,30 @@ function resolveInput(
     fs.writeFileSync(p, Buffer.from(b64, 'base64'));
     return { path: p, cleanup: () => fs.rmSync(dir, { recursive: true, force: true }), inline: true };
   }
-  if (inputPath) {
-    return { path: path.resolve(inputPath), cleanup: () => {}, inline: false };
+
+  if (inputUrl) {
+    const res = await fetch(inputUrl);
+    if (!res.ok) throw new Error(`Could not download input_url (${res.status} ${res.statusText}).`);
+    const buf = Buffer.from(await res.arrayBuffer());
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'screenflow-in-'));
+    const p = path.join(dir, `input${ext}`);
+    fs.writeFileSync(p, buf);
+    return { path: p, cleanup: () => fs.rmSync(dir, { recursive: true, force: true }), inline: true };
   }
-  throw new Error('Provide either input_path (a file on this machine) or input_base64 (the file contents).');
+
+  if (inputPath) {
+    const resolved = path.resolve(inputPath);
+    if (!fs.existsSync(resolved)) {
+      throw new Error(
+        `No file at "${resolved}". Do NOT guess paths. If the image was uploaded/attached (not a real file on the user's machine), pass it as input_base64 (the file's raw bytes, base64-encoded) or input_url instead. If it is a local file, ask the user for its exact path.`,
+      );
+    }
+    return { path: resolved, cleanup: () => {}, inline: false };
+  }
+
+  throw new Error(
+    'No input given. Provide exactly one of: input_base64 (preferred — the file bytes, base64-encoded), input_url (a public URL), or input_path (an existing file on the user\'s machine).',
+  );
 }
 
 // Read a produced still and return it as inline MCP content: an image block for
@@ -118,23 +141,26 @@ tool(
   {
     title: 'Frame a screenshot in a device mockup',
     description:
-      'Wrap a still screenshot (PNG/JPG/HEIC) in a pixel-perfect device frame (iPhone, iPad, iMac, Apple Watch). Use this whenever the user wants an app screenshot placed inside a realistic device mockup. Pass the image as input_base64 (recommended — works everywhere) or input_path (only if this server shares the agent\'s filesystem). The framed image is returned inline; output_path additionally saves it to disk. Output is PNG by default; use format "svg" for vector or "jpeg" for a smaller file.',
+      'Wrap a still screenshot (PNG/JPG/HEIC) in a pixel-perfect device frame (iPhone, iPad, iMac, Apple Watch). The framed image is returned INLINE in the response (no need to read any output file). ' +
+      'HOW TO PASS THE IMAGE — pick one: (1) input_base64 = the file\'s raw bytes base64-encoded — ALWAYS works, use this for attached/uploaded images or when you have the bytes from a read tool; (2) input_url = a public http(s) URL; (3) input_path = an EXISTING file on the user\'s machine. ' +
+      'Never invent a path like /mnt/... or /uploads/... — if you do not have a real local path, use input_base64.',
     inputSchema: {
-      input_base64: z.string().optional().describe('The screenshot file contents, base64-encoded (data: URI prefix is OK). Preferred — works without a shared filesystem.'),
-      input_path: z.string().optional().describe('Path to the screenshot on THIS machine. Only works if the server shares the agent\'s filesystem.'),
+      input_base64: z.string().optional().describe('The screenshot bytes, base64-encoded (data: URI prefix OK). Preferred — works in any environment.'),
+      input_url: z.string().optional().describe('Public http(s) URL of the screenshot; the server downloads it.'),
+      input_path: z.string().optional().describe('Path to an EXISTING screenshot on the machine running this server. Only if you have a real path.'),
       device: z.string().optional().describe(`Device frame id (default ${DEFAULT_DEVICE}). Use list_devices to see options.`),
       color: z.string().optional().describe('Frame color for the device (default: first color of the device).'),
       format: z.enum(['png', 'svg', 'jpeg']).optional().describe('Output format (default png).'),
-      output_path: z.string().optional().describe('Optional path to also save the result on this machine.'),
+      output_path: z.string().optional().describe('Optional path to ALSO save the result on the server machine.'),
     },
   },
-  async ({ input_base64, input_path, device, color, format, output_path }) => {
+  async ({ input_base64, input_url, input_path, device, color, format, output_path }) => {
     let input: { path: string; cleanup: () => void; inline: boolean } | undefined;
     let outTmp: string | undefined;
     try {
       const fmt: Format = format ?? 'png';
       const ext = fmt === 'svg' ? '.svg' : fmt === 'jpeg' ? '.jpeg' : '.png';
-      input = resolveInput(input_path, input_base64, '.png');
+      input = await resolveInput({ inputBase64: input_base64, inputUrl: input_url, inputPath: input_path, ext: '.png' });
       if (detectInputKind(input.path) === 'video') {
         return fail('frame_screenshot is for still images. For a screen recording use frame_recording.');
       }
@@ -170,18 +196,21 @@ tool(
   {
     title: 'Frame a screen recording in a device mockup',
     description:
-      'Wrap a screen recording (MP4/MOV/…) in a device frame: the device stays still while the screen plays the recording. Output length matches the recording. Defaults to a transparent .mov (HEVC with alpha, ~90× smaller than ProRes, plays in QuickTime/Keynote/Final Cut); set format "mp4" for H.264 on a black background. Pass the recording as input_base64 or input_path. Requires ffmpeg. Note: results can be large — provide output_path to save to disk; without it the result is returned inline as base64 only when small (<40 MB).',
+      'Wrap a screen recording (MP4/MOV/…) in a device frame: the device stays still while the screen plays the recording. Output length matches the recording. Defaults to a transparent .mov (HEVC with alpha, ~90× smaller than ProRes, plays in QuickTime/Keynote/Final Cut); set format "mp4" for H.264 on a black background. ' +
+      'HOW TO PASS THE RECORDING — pick one: input_base64 (raw bytes, base64), input_url (public URL), or input_path (an EXISTING local file). Never invent a path. Requires ffmpeg. ' +
+      'Videos are large: pass output_path to save to disk; without it the result is returned inline (base64) only when under 40 MB.',
     inputSchema: {
-      input_base64: z.string().optional().describe('The recording file contents, base64-encoded. Works without a shared filesystem.'),
-      input_path: z.string().optional().describe('Path to the recording on THIS machine (MP4/MOV/M4V/WEBM/MKV/AVI).'),
+      input_base64: z.string().optional().describe('The recording bytes, base64-encoded. Works without a shared filesystem.'),
+      input_url: z.string().optional().describe('Public http(s) URL of the recording; the server downloads it.'),
+      input_path: z.string().optional().describe('Path to an EXISTING recording on the server machine (MP4/MOV/M4V/WEBM/MKV/AVI).'),
       device: z.string().optional().describe(`Device frame id (default ${DEFAULT_DEVICE}).`),
       color: z.string().optional().describe('Frame color for the device.'),
       format: z.enum(['mov', 'mp4']).optional().describe('mov = transparent HEVC (default); mp4 = H.264 on black.'),
       mute: z.boolean().optional().describe('Drop the audio track (default false).'),
-      output_path: z.string().optional().describe('Optional path to save the result on this machine.'),
+      output_path: z.string().optional().describe('Optional path to save the result on the server machine.'),
     },
   },
-  async ({ input_base64, input_path, device, color, format, mute, output_path }) => {
+  async ({ input_base64, input_url, input_path, device, color, format, mute, output_path }) => {
     let input: { path: string; cleanup: () => void; inline: boolean } | undefined;
     let outTmp: string | undefined;
     try {
@@ -189,7 +218,7 @@ tool(
         return fail('ffmpeg is required for screen recordings but was not found. Install it with: brew install ffmpeg');
       }
       const ext = format === 'mp4' ? '.mp4' : '.mov';
-      input = resolveInput(input_path, input_base64, '.mp4');
+      input = await resolveInput({ inputBase64: input_base64, inputUrl: input_url, inputPath: input_path, ext: '.mp4' });
       if (detectInputKind(input.path) !== 'video') {
         return fail('frame_recording is for screen recordings. For a still image use frame_screenshot.');
       }
@@ -239,24 +268,26 @@ tool(
   {
     title: 'Create an App Store screenshot',
     description:
-      `Turn a screenshot into a ready-to-upload App Store screenshot at the mandatory ${APPSTORE_SIZE.w}×${APPSTORE_SIZE.h} (iPhone 6.5") size: a headline caption on top (SF Pro Display, auto-contrast color), the framed device below, on a solid background. Use this when the user wants App Store / marketing screenshots with a tagline. Pass the image as input_base64 (recommended) or input_path; the result is returned inline, and output_path additionally saves it.`,
+      `Turn a screenshot into a ready-to-upload App Store screenshot at the mandatory ${APPSTORE_SIZE.w}×${APPSTORE_SIZE.h} (iPhone 6.5") size: a headline caption on top (SF Pro Display, auto-contrast color), the framed device below, on a solid background. The result is returned INLINE. ` +
+      'HOW TO PASS THE IMAGE — pick one: input_base64 (raw bytes base64-encoded — use for attached/uploaded images), input_url (public URL), or input_path (an EXISTING local file). Never invent a path.',
     inputSchema: {
-      input_base64: z.string().optional().describe('The screenshot file contents, base64-encoded (data: URI prefix is OK). Preferred — works without a shared filesystem.'),
-      input_path: z.string().optional().describe('Path to the screenshot on THIS machine. Only works if the server shares the agent\'s filesystem.'),
+      input_base64: z.string().optional().describe('The screenshot bytes, base64-encoded (data: URI prefix OK). Preferred — works in any environment.'),
+      input_url: z.string().optional().describe('Public http(s) URL of the screenshot; the server downloads it.'),
+      input_path: z.string().optional().describe('Path to an EXISTING screenshot on the server machine. Only if you have a real path.'),
       caption: z.string().optional().describe('Headline text above the device. Use "\\n" for a manual line break.'),
       align: z.enum(['left', 'center', 'right']).optional().describe('Caption alignment (default center).'),
       bg: z.string().optional().describe('Background color as hex, e.g. "#0A84FF" (default #0A84FF).'),
       device: z.string().optional().describe(`Device frame id (default ${DEFAULT_DEVICE}).`),
       color: z.string().optional().describe('Frame color for the device.'),
       jpeg: z.boolean().optional().describe('Output JPEG instead of PNG (default false).'),
-      output_path: z.string().optional().describe('Optional path to also save the result on this machine.'),
+      output_path: z.string().optional().describe('Optional path to ALSO save the result on the server machine.'),
     },
   },
-  async ({ input_base64, input_path, caption, align, bg, device, color, jpeg, output_path }) => {
+  async ({ input_base64, input_url, input_path, caption, align, bg, device, color, jpeg, output_path }) => {
     let input: { path: string; cleanup: () => void; inline: boolean } | undefined;
     let outTmp: string | undefined;
     try {
-      input = resolveInput(input_path, input_base64, '.png');
+      input = await resolveInput({ inputBase64: input_base64, inputUrl: input_url, inputPath: input_path, ext: '.png' });
       const resolved = resolveDeviceColor(device, color);
       const ext = jpeg ? '.jpg' : '.png';
 
