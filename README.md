@@ -204,7 +204,7 @@ screenflow ships an **MCP server** (`screenflow-mcp`) so AI coding agents — **
 
 **Tools exposed:** `frame_screenshot`, `frame_recording`, `create_appstore_screenshot`, `list_devices`.
 
-Each media tool accepts the input as **`input_base64`** (recommended) or `input_path`, and returns the result **inline** (PNG/JPEG as an image block). This means the tools work even when the agent runs in a sandbox/container that doesn't share the server's filesystem — no path juggling required. Pass `output_path` to additionally save the result to disk.
+Each media tool takes the input **one of three ways** — `input_base64` (the raw bytes, recommended for attached/uploaded images), `input_url` (a public URL the server downloads), or `input_path` (an existing local file) — and returns the result **inline** (PNG/JPEG as an image block). This means the tools work even when the agent runs in a sandbox/container that doesn't share the server's filesystem — no path juggling required. If a bogus path is passed, the tool replies with guidance to use base64/URL instead. Pass `output_path` to additionally save the result to disk.
 
 ### Zero-config setup
 
