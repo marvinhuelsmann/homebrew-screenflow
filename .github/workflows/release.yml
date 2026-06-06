@@ -152,8 +152,9 @@ jobs:
       - name: Skip if this version is already on npm
         id: check
         run: |
+          NAME=$(jq -r .name package.json)
           V=$(jq -r .version package.json)
-          if npm view "screenflow@$V" version >/dev/null 2>&1; then
+          if npm view "$NAME@$V" version >/dev/null 2>&1; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
