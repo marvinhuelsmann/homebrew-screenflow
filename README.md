@@ -209,7 +209,7 @@ screenflow ships an **MCP server** (`screenflow-mcp`) so AI coding agents — **
 Installing the CLI **automatically registers the MCP server** with every AI agent it finds on your machine — no manual steps:
 
 ```bash
-brew install marvinhuelsmann/screenflow/screenflow   # or: npm i -g screenflow
+brew install marvinhuelsmann/screenflow/screenflow   # or: npm i -g @marvinhuelsmann/screenflow
 ```
 
 That's it. Restart your agent and ask it to frame a screenshot. Re-run the registration anytime (e.g. after installing a new agent):
