@@ -36,6 +36,8 @@ jobs:
     if: github.actor != 'github-actions[bot]'
     permissions:
       contents: write
+    outputs:
+      released: ${{ steps.released.outputs.value }}
 
     steps:
       - uses: actions/checkout@v4
@@ -55,6 +57,11 @@ jobs:
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Mark released
+        if: steps.tag_check.outputs.exists == 'false'
+        id: released
+        run: echo "value=true" >> "$GITHUB_OUTPUT"
 
       - name: Find previous release tag
         if: steps.tag_check.outputs.exists == 'false'
@@ -119,3 +126,41 @@ jobs:
           fi
           git commit -m "chore: update formula to ${{ steps.version.outputs.value }}"
           git push origin HEAD:master
+
+  publish:
+    needs: release
+    runs-on: ubuntu-latest
+    # Only when the release job actually cut a new version. Requires the
+    # NPM_TOKEN repo secret (an npm "Automation" classic token).
+    if: needs.release.outputs.released == 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: "https://registry.npmjs.org"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Skip if this version is already on npm
+        id: check
+        run: |
+          V=$(jq -r .version package.json)
+          if npm view "screenflow@$V" version >/dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish to npm
+        if: steps.check.outputs.skip == 'false'
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
