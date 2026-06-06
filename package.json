@@ -1,6 +1,6 @@
 {
   "name": "screenflow",
-  "version": "0.3.46",
+  "version": "0.4.11",
   "description": "CLI tool to create beautiful mockup device screenshots",
   "homepage": "https://github.com/marvinhuelsmann/screenflow",
   "repository": {
@@ -16,9 +16,18 @@
     "screenflow": "dist/index.js",
     "screenflow-mcp": "dist/mcp.js"
   },
+  "files": [
+    "dist",
+    "completions",
+    "scripts/postinstall.js"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc && cp -r src/frames/iphone-17-pro dist/frames/ && cp -r src/frames/ipad-pro-11 dist/frames/ && cp -r src/frames/ipad-pro-13 dist/frames/ && cp -r src/frames/iphone-16-pro dist/frames/ && cp -r src/frames/iphone-air dist/frames/ && cp -r src/frames/iphone-17 dist/frames/ && cp -r src/frames/iphone-16 dist/frames/ && cp -r src/frames/imac dist/frames/ && cp -r src/frames/apple-watch-ultra dist/frames/ && cp -r src/frames/apple-watch-series-11 dist/frames/",
     "prepare": "npm run build",
+    "postinstall": "node scripts/postinstall.js",
     "dev": "ts-node src/index.ts",
     "start": "node dist/index.js",
     "add-device": "node scripts/add-device.js",

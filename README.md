@@ -28,6 +28,7 @@ screenflow screenshot.png
 | `screenflow <file>` | Frame a screenshot (default) |
 | `screenflow video <file>` | Create an animated marketing video |
 | `screenflow appstore <file>` | Generate a ready-to-upload App Store screenshot |
+| `screenflow mcp install` | Register the MCP server with your AI agents (auto-runs on install) |
 | `screenflow devices` | List all available devices and their colors |
 | `screenflow config` | Show your saved defaults |
 | `screenflow set-default` | Set a default device and color interactively |
@@ -199,39 +200,47 @@ screenflow shot.heic -d iphone-17 --png
 
 ## Use it from AI agents (MCP)
 
-screenflow ships an **MCP server** (`screenflow-mcp`) so AI coding agents — **Claude Code, Codex, Cursor, Claude Desktop** — can frame screenshots, build App Store screenshots and wrap recordings for you. Register it once, and the agent picks the right tool automatically whenever you ask it to "put this screenshot in an iPhone mockup" or "make App Store screenshots".
+screenflow ships an **MCP server** (`screenflow-mcp`) so AI coding agents — **Claude Code, Codex, Cursor, Claude Desktop** — can frame screenshots, build App Store screenshots and wrap recordings for you. Ask the agent to "put this screenshot in an iPhone mockup" or "make App Store screenshots" and it picks the right tool automatically.
 
 **Tools exposed:** `frame_screenshot`, `frame_recording`, `create_appstore_screenshot`, `list_devices`.
 
-### Claude Code
+### Zero-config setup
+
+Installing the CLI **automatically registers the MCP server** with every AI agent it finds on your machine — no manual steps:
 
 ```bash
-# After `brew install marvinhuelsmann/screenflow/screenflow`
+brew install marvinhuelsmann/screenflow/screenflow   # or: npm i -g screenflow
+```
+
+That's it. Restart your agent and ask it to frame a screenshot. Re-run the registration anytime (e.g. after installing a new agent):
+
+```bash
+screenflow mcp install              # register with all detected agents
+screenflow mcp install --dry-run    # preview what it would change
+screenflow mcp uninstall            # remove the registration everywhere
+```
+
+### Manual setup (optional)
+
+If you'd rather wire it up by hand:
+
+```bash
+# Claude Code
 claude mcp add screenflow -- screenflow-mcp
 ```
 
-### Codex
-
-Add to `~/.codex/config.toml`:
-
 ```toml
+# Codex — ~/.codex/config.toml
 [mcp_servers.screenflow]
 command = "screenflow-mcp"
 ```
 
-### Cursor / Claude Desktop
-
-Add to the client's MCP config (`mcpServers`):
-
 ```json
-{
-  "mcpServers": {
-    "screenflow": { "command": "screenflow-mcp" }
-  }
-}
+// Cursor / Claude Desktop — mcpServers
+{ "mcpServers": { "screenflow": { "command": "screenflow-mcp" } } }
 ```
 
-> `screenflow-mcp` is installed automatically alongside the `screenflow` CLI (Homebrew or `npm i -g screenflow`). It communicates over stdio and requires no extra setup; ffmpeg is only needed for the recording tool.
+> The server communicates over stdio and needs no extra setup; ffmpeg is only required for the recording tool.
 
 ### Supported Devices
 

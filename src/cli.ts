@@ -3,6 +3,7 @@ import { version } from '../package.json';
 import { frameAction } from './commands/frame';
 import { videoAction } from './commands/video';
 import { appstoreAction } from './commands/appstore';
+import { mcpInstallAction, mcpUninstallAction } from './commands/mcpSetup';
 import { setDefaultAction } from './commands/setDefault';
 import { devicesAction } from './commands/devices';
 import { showConfigAction } from './commands/showConfig';
@@ -130,6 +131,36 @@ function buildProgram(): Command {
     .command('author')
     .description('About the author')
     .action(authorAction);
+
+  const mcp = program
+    .command('mcp')
+    .description('Manage the screenflow MCP server for AI agents (Claude Code, Codex, Cursor, Claude Desktop)');
+
+  mcp
+    .command('install')
+    .description('Register the MCP server with every AI agent detected on this machine')
+    .option('--dry-run', 'Show what would change without writing anything')
+    .action(async (options) => {
+      try {
+        await mcpInstallAction({ dryRun: Boolean(options.dryRun) });
+      } catch (err) {
+        console.error(`\nError: ${err instanceof Error ? err.message : String(err)}`);
+        process.exit(1);
+      }
+    });
+
+  mcp
+    .command('uninstall')
+    .description('Remove the MCP server registration from all AI agents')
+    .option('--dry-run', 'Show what would change without writing anything')
+    .action(async (options) => {
+      try {
+        await mcpUninstallAction({ dryRun: Boolean(options.dryRun) });
+      } catch (err) {
+        console.error(`\nError: ${err instanceof Error ? err.message : String(err)}`);
+        process.exit(1);
+      }
+    });
 
   return program;
 }

@@ -82,6 +82,12 @@ git checkout master && git merge develop && git push origin master
 
 ## Release workflow
 
-Bump `"version"` in `package.json`, commit, push to `master`. The **Auto Tag** and Release workflow (`.github/workflows/tag.yml`) reads the version and pushes a `v*` tag automatically. The **Release** workflow (`.github/workflows/release.yml`) then creates the GitHub release and updates `Formula/screenflow.rb` with the new tarball URL and SHA256.
+Bump `"version"` in `package.json`, commit, push to `master`. The **Auto Tag** and Release workflow (`.github/workflows/tag.yml`) reads the version and pushes a `v*` tag automatically. The **Release** workflow (`.github/workflows/release.yml`) then creates the GitHub release and updates `Formula/screenflow.rb` with the new tarball URL and SHA256. The **npm publish** workflow (`.github/workflows/npm-publish.yml`) fires on the `v*` tag and runs `npm publish` (needs an `NPM_TOKEN` repo secret).
 
 The source code and Homebrew formula live in the same repo (`homebrew-screenflow`). `brew tap marvinhuelsmann/screenflow` resolves to this repo because Homebrew prepends `homebrew-` to tap repo names.
+
+### Distribution & MCP auto-registration
+
+npm publish requires the `files` whitelist in `package.json` (it overrides the gitignored `dist/`); without it the published package would ship no `dist/`. Both `screenflow` and `screenflow-mcp` bins point into `dist/`.
+
+Installing the CLI auto-registers the MCP server with detected AI agents: the npm `postinstall` script (`scripts/postinstall.js`) runs `mcpInstallAction` **only on global installs** (`npm_config_global === 'true'`, so dev/CI installs are a no-op), and the Homebrew formula's `post_install` runs `screenflow mcp install`. The worker lives in `src/commands/mcpSetup.ts` (Claude Code via the `claude` CLI; Codex/Cursor/Claude Desktop via their config files) — idempotent and never throws.

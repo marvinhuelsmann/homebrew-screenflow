@@ -23,6 +23,24 @@ class Screenflow < Formula
     SH
   end
 
+  # Auto-register the MCP server with whatever AI agents are installed. The
+  # command is idempotent and skips absent tools, so this never breaks install.
+  def post_install
+    system bin/"screenflow", "mcp", "install"
+  rescue StandardError
+    nil
+  end
+
+  def caveats
+    <<~EOS
+      The screenflow MCP server was auto-registered with the AI agents found on
+      your machine (Claude Code, Codex, Cursor, Claude Desktop). Restart your
+      agent, then ask it to "frame this screenshot in an iPhone".
+
+      Re-run anytime with:  screenflow mcp install
+    EOS
+  end
+
   test do
     assert_match version.to_s, shell_output("#{bin}/screenflow --version")
   end

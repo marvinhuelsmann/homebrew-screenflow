@@ -1,6 +1,6 @@
 function __fish_screenflow_no_subcommand
     for i in (commandline -opc)
-        if contains -- $i video appstore devices config set-default author
+        if contains -- $i video appstore mcp devices config set-default author
             return 1
         end
     end
@@ -14,6 +14,9 @@ complete -c screenflow -s h -l help    -d 'Display help'
 # Subcommands (only when no subcommand has been given yet)
 complete -c screenflow -n '__fish_screenflow_no_subcommand' -f -a 'video'       -d 'Create a 9-second animated marketing video apple-watch-ultra\t"Apple Watch Ultra" apple-watch-series-11\t"Apple Watch Series 11""'
 complete -c screenflow -n '__fish_screenflow_no_subcommand' -f -a 'appstore'    -d 'Generate a ready-to-upload App Store screenshot (1242×2688)'
+complete -c screenflow -n '__fish_screenflow_no_subcommand' -f -a 'mcp'         -d 'Manage the MCP server for AI agents'
+complete -c screenflow -n '__fish_seen_subcommand_from mcp' -f -a 'install'     -d 'Register with detected AI agents'
+complete -c screenflow -n '__fish_seen_subcommand_from mcp' -f -a 'uninstall'   -d 'Remove the registration'
 complete -c screenflow -n '__fish_screenflow_no_subcommand' -f -a 'devices'     -d 'List all available devices and their colors'
 complete -c screenflow -n '__fish_screenflow_no_subcommand' -f -a 'config'      -d 'Show saved defaults'
 complete -c screenflow -n '__fish_screenflow_no_subcommand' -f -a 'set-default' -d 'Set a default device and color interactively'
