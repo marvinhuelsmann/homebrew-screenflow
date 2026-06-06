@@ -1,13 +1,12 @@
-name: npm publish
+name: npm publish (manual)
 
-# Publishes the package to npm whenever a v* tag is pushed (the Auto Tag
-# workflow creates that tag from the version in package.json on master).
-# Requires an NPM_TOKEN repository secret (npm automation token).
+# Manual "publish current version to npm" button. Automatic publishing happens
+# in the Release pipeline (release.yml → publish job); this is a fallback you can
+# run from the Actions tab — e.g. to publish a version whose auto-publish failed
+# (such as the first run before NPM_TOKEN was set).
+# Requires an NPM_TOKEN repository secret (npm "Automation" classic token).
 
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
 
 jobs:
