@@ -345,11 +345,10 @@ tool(
     title: 'Frame a screenshot in a device mockup',
     description:
       'Wrap a still screenshot (PNG/JPG/HEIC) in a pixel-perfect device frame (iPhone, iPad, iMac, Apple Watch). The framed image is returned INLINE. ' +
-      'INPUT: provide input_path (real local path) or input_url (public URL). ' +
-      'If the user dropped/attached an image and you have no path, omit both — the tool automatically finds and uses the most recently modified image from Desktop/Downloads/Screenshots. ' +
-      'Never pass base64. Never invent paths.',
+      'INPUT: use input_path (real local path on this machine) or input_url (public URL). ' +
+      'If the user dropped/attached an image but you do not have its path, ASK the user: "What is the file path of the image?" — do NOT guess or invent paths, do NOT use base64.',
     inputSchema: {
-      input_path: z.string().optional().describe('Path to an EXISTING screenshot on this machine. Omit to auto-detect the most recent image.'),
+      input_path: z.string().optional().describe('Absolute path to an EXISTING screenshot on this machine, e.g. /Users/john/Desktop/screenshot.png'),
       input_url: z.string().optional().describe('Public http(s) URL of the screenshot.'),
       device: z.string().optional().describe(`Device frame id (default ${DEFAULT_DEVICE}). Use list_devices to see options.`),
       color: z.string().optional().describe('Frame color (default: first color of the device).'),
@@ -365,16 +364,10 @@ tool(
       const fmt: Format = format ?? 'png';
       const ext = fmt === 'svg' ? '.svg' : fmt === 'jpeg' ? '.jpeg' : '.png';
 
-      // Auto-detect most recent image when no input specified.
-      let autoDetected: string | undefined;
       if (!input_path && !input_url) {
-        const found = findMostRecent('image');
-        if (!found) return fail('No input specified and no recent images found in Desktop/Downloads/Screenshots. Provide input_path or input_url.');
-        autoDetected = found;
-        input = { path: found, cleanup: () => {}, inline: false };
-      } else {
-        input = await resolveInput({ inputUrl: input_url, inputPath: input_path, ext: '.png' });
+        return fail('No file path provided. Ask the user: "What is the file path of the image you want to frame?" — then call this tool again with input_path.');
       }
+      input = await resolveInput({ inputUrl: input_url, inputPath: input_path, ext: '.png' });
 
       if (detectInputKind(input.path) === 'video') {
         return fail('frame_screenshot is for still images. For a screen recording use frame_recording.');
@@ -388,11 +381,10 @@ tool(
 
       await compose(input.path, resolved.device, outputPath, fmt, resolved.color);
 
-      const autoMsg = autoDetected ? `Auto-detected: ${autoDetected}\n` : '';
       const saved = output_path || !input.inline ? `Saved to ${outputPath}. ` : '';
       return {
         content: [
-          { type: 'text', text: `${autoMsg}${saved}Framed ${resolved.device} · ${resolved.color} · ${fmt.toUpperCase()}.` },
+          { type: 'text', text: `${saved}Framed ${resolved.device} · ${resolved.color} · ${fmt.toUpperCase()}.` },
           await stillContent(outputPath, fmt, inline_max_px ?? 1568),
         ],
       };
@@ -412,11 +404,12 @@ tool(
     title: 'Frame a screen recording in a device mockup',
     description:
       'Wrap a screen recording (MP4/MOV/…) in a device frame: the device stays still while the screen plays the recording. Output length matches the recording. Defaults to a transparent .mov (HEVC with alpha, ~90× smaller than ProRes, plays in QuickTime/Keynote/Final Cut); set format "mp4" for H.264 on a black background. ' +
-      'INPUT: provide input_path (real local path) or input_url (public URL). If you have no path, omit both — the tool automatically finds the most recently modified video in Movies/Downloads. Never pass base64. Requires ffmpeg. ' +
+      'INPUT: use input_path (real local path) or input_url (public URL). ' +
+      'If you do not have the path, ASK the user: "What is the file path of the recording?" — do NOT guess. Requires ffmpeg. ' +
       'Videos are large — always pass output_path to save to disk; without it the result is returned inline only when under 40 MB.',
     inputSchema: {
       input_url: z.string().optional().describe('Public http(s) URL of the recording; the server downloads it.'),
-      input_path: z.string().optional().describe('Path to an EXISTING recording on this machine. Omit to auto-detect the most recent video.'),
+      input_path: z.string().optional().describe('Absolute path to an EXISTING recording on this machine, e.g. /Users/john/Movies/recording.mov'),
       device: z.string().optional().describe(`Device frame id (default ${DEFAULT_DEVICE}).`),
       color: z.string().optional().describe('Frame color for the device.'),
       format: z.enum(['mov', 'mp4']).optional().describe('mov = transparent HEVC (default); mp4 = H.264 on black.'),
@@ -433,15 +426,10 @@ tool(
       }
       const ext = format === 'mp4' ? '.mp4' : '.mov';
 
-      let autoDetected: string | undefined;
       if (!input_path && !input_url) {
-        const found = findMostRecent('video');
-        if (!found) return fail('No input specified and no recent videos found in Movies/Downloads. Provide input_path or input_url.');
-        autoDetected = found;
-        input = { path: found, cleanup: () => {}, inline: false };
-      } else {
-        input = await resolveInput({ inputUrl: input_url, inputPath: input_path, ext: '.mp4' });
+        return fail('No file path provided. Ask the user: "What is the file path of the recording you want to frame?" — then call this tool again with input_path.');
       }
+      input = await resolveInput({ inputUrl: input_url, inputPath: input_path, ext: '.mp4' });
       if (detectInputKind(input.path) !== 'video') {
         return fail('frame_recording is for screen recordings. For a still image use frame_screenshot.');
       }
@@ -462,8 +450,7 @@ tool(
       // Persisted to a real path → just report it. Inline (base64) input with no
       // output_path → return the bytes if small enough, else ask for a path.
       if (output_path || !input.inline) {
-        const autoMsg = autoDetected ? `Auto-detected: ${autoDetected}\n` : '';
-        return ok(`${autoMsg}Framed recording saved to ${outputPath} (${resolved.device} · ${resolved.color} · ${kind}).`);
+        return ok(`Framed recording saved to ${outputPath} (${resolved.device} · ${resolved.color} · ${kind}).`);
       }
       const size = fs.statSync(outputPath).size;
       if (size > 40 * 1024 * 1024) {
