@@ -125,6 +125,55 @@ function tool(name: string, config: ToolConfig, handler: (args: any) => Promise<
   (server.registerTool as (n: string, c: ToolConfig, h: (a: any) => Promise<ToolResult>) => void)(name, config, handler);
 }
 
+// ── write_temp_file ──────────────────────────────────────────────────────────
+// Chunked file ingestion so large images and recordings from Claude Desktop
+// (or other MCP clients that can't resolve local paths) can be transferred to
+// the server without hitting per-call base64 size limits.  Typical flow:
+//   1. handle = write_temp_file(chunk=first_500k_b64, ext=".png")
+//   2. handle = write_temp_file(chunk=next_500k_b64, handle=handle)
+//   3. path   = write_temp_file(chunk=last_b64, handle=handle, done=true)
+//   4. frame_screenshot(input_path=path)
+tool(
+  'write_temp_file',
+  {
+    title: 'Write large file to temp path for processing',
+    description:
+      'Write a file to a temporary path on the server machine so it can be used as input_path in frame_screenshot, frame_recording, or create_appstore_screenshot. ' +
+      'For large files (images > ~500 KB, any video) split the base64 into chunks of ~500 000 characters and call this tool repeatedly, passing the returned handle back on each call. ' +
+      'Pass done: true on the last chunk — the tool then returns the final temp path. ' +
+      'Use this instead of inline input_base64 whenever the file is too large to fit in a single tool call.',
+    inputSchema: {
+      chunk: z.string().describe('Base64-encoded chunk of file bytes. A data: URI prefix on the first chunk is fine and will be stripped.'),
+      handle: z.string().optional().describe('Temp-file path returned by a previous write_temp_file call. Omit on the first chunk.'),
+      ext: z.string().optional().describe('File extension including the dot, e.g. ".png" or ".mp4". Required on the first chunk; ignored on subsequent chunks.'),
+      done: z.boolean().optional().describe('Set true on the last chunk to signal the file is complete. The response will include the final path to pass as input_path.'),
+    },
+  },
+  async ({ chunk, handle, ext, done }) => {
+    try {
+      let filePath: string;
+      if (handle) {
+        filePath = path.resolve(handle);
+        if (!fs.existsSync(filePath)) {
+          return fail(`Invalid handle "${handle}" — file not found. Start a new upload without passing a handle.`);
+        }
+      } else {
+        const fileExt = (ext ?? '.bin').replace(/^(?!\.)/, '.');
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'screenflow-upload-'));
+        filePath = path.join(dir, `input${fileExt}`);
+      }
+      const b64 = chunk.replace(/^data:[^;]+;base64,/, '');
+      fs.appendFileSync(filePath, Buffer.from(b64, 'base64'));
+      if (done) {
+        return ok(`File ready. Use input_path: "${filePath}" in frame_screenshot, frame_recording, or create_appstore_screenshot.`);
+      }
+      return ok(`Chunk written. Continue with: handle: "${filePath}". Call again with the next chunk (or set done: true on the last one).`);
+    } catch (err) {
+      return fail(`write_temp_file failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  },
+);
+
 // ── list_devices ─────────────────────────────────────────────────────────────
 tool(
   'list_devices',
@@ -154,7 +203,7 @@ tool(
     title: 'Frame a screenshot in a device mockup',
     description:
       'Wrap a still screenshot (PNG/JPG/HEIC) in a pixel-perfect device frame (iPhone, iPad, iMac, Apple Watch). The framed image is returned INLINE (downscaled preview; full resolution goes to output_path). ' +
-      'HOW TO PASS THE IMAGE — in order of preference: (1) input_path = path to a real EXISTING file on the machine running this server — FASTEST, use this whenever you have a real local path (e.g. you are an agent on the same computer); (2) input_url = a public http(s) URL the server downloads; (3) input_base64 = the raw bytes base64-encoded — works anywhere but is SLOW and expensive for files over ~500 KB (you must emit the whole blob), so only use it when no path or URL is available. Never invent a path you have not verified.',
+      'HOW TO PASS THE IMAGE — in order of preference: (1) input_path = path to a real EXISTING file on the server machine — FASTEST; (2) input_url = a public https URL; (3) for files dropped/attached in the client that have no real path: if the file is < ~500 KB pass it as input_base64; if it is larger, use write_temp_file (chunked upload) and then pass the returned path as input_path. Never invent a path you have not verified.',
     inputSchema: {
       input_path: z.string().optional().describe('Path to a real EXISTING screenshot on the machine running this server. Fastest — prefer this when you have a real local path.'),
       input_url: z.string().optional().describe('Public http(s) URL of the screenshot; the server downloads it. Fast.'),
@@ -209,8 +258,8 @@ tool(
     title: 'Frame a screen recording in a device mockup',
     description:
       'Wrap a screen recording (MP4/MOV/…) in a device frame: the device stays still while the screen plays the recording. Output length matches the recording. Defaults to a transparent .mov (HEVC with alpha, ~90× smaller than ProRes, plays in QuickTime/Keynote/Final Cut); set format "mp4" for H.264 on a black background. ' +
-      'HOW TO PASS THE RECORDING — pick one: input_base64 (raw bytes, base64), input_url (public URL), or input_path (an EXISTING local file). Never invent a path. Requires ffmpeg. ' +
-      'Videos are large: pass output_path to save to disk; without it the result is returned inline (base64) only when under 40 MB.',
+      'HOW TO PASS THE RECORDING — pick one: input_path (existing local file — fastest), input_url (public URL), or for files without a real path use write_temp_file (chunked) then input_path with the result. Never invent a path. Requires ffmpeg. ' +
+      'Videos are large — always pass output_path to save to disk; without it the result is returned inline only when under 40 MB.',
     inputSchema: {
       input_base64: z.string().optional().describe('The recording bytes, base64-encoded. Works without a shared filesystem.'),
       input_url: z.string().optional().describe('Public http(s) URL of the recording; the server downloads it.'),
@@ -281,7 +330,7 @@ tool(
     title: 'Create an App Store screenshot',
     description:
       `Turn a screenshot into a ready-to-upload App Store screenshot at the mandatory ${APPSTORE_SIZE.w}×${APPSTORE_SIZE.h} (iPhone 6.5") size: a headline caption on top (SF Pro Display, auto-contrast color), the framed device below, on a solid background. The result is returned INLINE (downscaled preview; full resolution goes to output_path). ` +
-      'HOW TO PASS THE IMAGE — in order of preference: input_path (a real EXISTING local file — FASTEST), input_url (public URL), or input_base64 (raw bytes — works anywhere but SLOW for large files, last resort). Never invent a path.',
+      'HOW TO PASS THE IMAGE — in order of preference: input_path (a real EXISTING local file — FASTEST), input_url (public URL), or for attached files without a real path: input_base64 if small (< ~500 KB), otherwise use write_temp_file (chunked) then input_path with the result. Never invent a path.',
     inputSchema: {
       input_path: z.string().optional().describe('Path to a real EXISTING screenshot on the server machine. Fastest — prefer this.'),
       input_url: z.string().optional().describe('Public http(s) URL of the screenshot; the server downloads it. Fast.'),
