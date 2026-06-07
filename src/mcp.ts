@@ -299,11 +299,10 @@ tool(
     title: 'Frame a screenshot in a device mockup',
     description:
       'Wrap a still screenshot (PNG/JPG/HEIC) in a pixel-perfect device frame (iPhone, iPad, iMac, Apple Watch). The framed image is returned INLINE (downscaled preview; full resolution goes to output_path). ' +
-      'HOW TO PASS THE IMAGE — BEST: call find_recent_files or get_clipboard_path to discover a real filesystem path, then use input_path (no data transfer at all). If you already have a path: input_path. If you have a public URL: input_url. Only as last resort: input_base64 for small files (< ~300 KB) — larger files get truncated by the AI and cause corrupt-header errors. Never invent a path you have not verified.',
+      'HOW TO PASS THE IMAGE: (1) call find_recent_files() to locate the file on disk, then use input_path — ALWAYS do this first when the user dropped or attached an image; (2) input_path if you already know the real path; (3) input_url for a public URL. Never pass base64 — use find_recent_files or get_clipboard_path instead. Never invent a path you have not verified.',
     inputSchema: {
-      input_path: z.string().optional().describe('Path to a real EXISTING screenshot on the machine running this server. Fastest — prefer this when you have a real local path.'),
-      input_url: z.string().optional().describe('Public http(s) URL of the screenshot; the server downloads it. Fast.'),
-      input_base64: z.string().optional().describe('The screenshot bytes, base64-encoded (data: URI prefix OK). Works anywhere but SLOW for large files — last resort.'),
+      input_path: z.string().optional().describe('Path to a real EXISTING screenshot on the machine running this server.'),
+      input_url: z.string().optional().describe('Public http(s) URL of the screenshot; the server downloads it.'),
       device: z.string().optional().describe(`Device frame id (default ${DEFAULT_DEVICE}). Use list_devices to see options.`),
       color: z.string().optional().describe('Frame color for the device (default: first color of the device).'),
       format: z.enum(['png', 'svg', 'jpeg']).optional().describe('Output format (default png).'),
@@ -311,13 +310,13 @@ tool(
       inline_max_px: z.number().optional().describe('Max long edge of the inline preview image (default 1568; 0 = full resolution inline).'),
     },
   },
-  async ({ input_base64, input_url, input_path, device, color, format, output_path, inline_max_px }) => {
+  async ({ input_url, input_path, device, color, format, output_path, inline_max_px }) => {
     let input: { path: string; cleanup: () => void; inline: boolean } | undefined;
     let outTmp: string | undefined;
     try {
       const fmt: Format = format ?? 'png';
       const ext = fmt === 'svg' ? '.svg' : fmt === 'jpeg' ? '.jpeg' : '.png';
-      input = await resolveInput({ inputBase64: input_base64, inputUrl: input_url, inputPath: input_path, ext: '.png' });
+      input = await resolveInput({ inputUrl: input_url, inputPath: input_path, ext: '.png' });
       if (detectInputKind(input.path) === 'video') {
         return fail('frame_screenshot is for still images. For a screen recording use frame_recording.');
       }
@@ -354,10 +353,9 @@ tool(
     title: 'Frame a screen recording in a device mockup',
     description:
       'Wrap a screen recording (MP4/MOV/…) in a device frame: the device stays still while the screen plays the recording. Output length matches the recording. Defaults to a transparent .mov (HEVC with alpha, ~90× smaller than ProRes, plays in QuickTime/Keynote/Final Cut); set format "mp4" for H.264 on a black background. ' +
-      'HOW TO PASS THE RECORDING — BEST: call find_recent_files(type:"video") to discover the real path, then use input_path. If you already have a path: input_path. If you have a public URL: input_url. Never invent a path. Requires ffmpeg. ' +
+      'HOW TO PASS THE RECORDING: (1) call find_recent_files(type:"video") to locate the recording on disk, then use input_path — ALWAYS do this first; (2) input_path if you already know the real path; (3) input_url for a public URL. Never pass base64. Requires ffmpeg. ' +
       'Videos are large — always pass output_path to save to disk; without it the result is returned inline only when under 40 MB.',
     inputSchema: {
-      input_base64: z.string().optional().describe('The recording bytes, base64-encoded. Works without a shared filesystem.'),
       input_url: z.string().optional().describe('Public http(s) URL of the recording; the server downloads it.'),
       input_path: z.string().optional().describe('Path to an EXISTING recording on the server machine (MP4/MOV/M4V/WEBM/MKV/AVI).'),
       device: z.string().optional().describe(`Device frame id (default ${DEFAULT_DEVICE}).`),
@@ -367,7 +365,7 @@ tool(
       output_path: z.string().optional().describe('Optional path to save the result on the server machine.'),
     },
   },
-  async ({ input_base64, input_url, input_path, device, color, format, mute, output_path }) => {
+  async ({ input_url, input_path, device, color, format, mute, output_path }) => {
     let input: { path: string; cleanup: () => void; inline: boolean } | undefined;
     let outTmp: string | undefined;
     try {
@@ -375,7 +373,7 @@ tool(
         return fail('ffmpeg is required for screen recordings but was not found. Install it with: brew install ffmpeg');
       }
       const ext = format === 'mp4' ? '.mp4' : '.mov';
-      input = await resolveInput({ inputBase64: input_base64, inputUrl: input_url, inputPath: input_path, ext: '.mp4' });
+      input = await resolveInput({ inputUrl: input_url, inputPath: input_path, ext: '.mp4' });
       if (detectInputKind(input.path) !== 'video') {
         return fail('frame_recording is for screen recordings. For a still image use frame_screenshot.');
       }
