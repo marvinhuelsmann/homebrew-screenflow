@@ -8,6 +8,7 @@
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
+import { execSync } from 'child_process';
 import sharp from 'sharp';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -174,6 +175,86 @@ tool(
   },
 );
 
+// ── find_recent_files ────────────────────────────────────────────────────────
+tool(
+  'find_recent_files',
+  {
+    title: 'Find recent images / recordings on this machine',
+    description:
+      'List the most recently modified screenshot and video files on the local machine (Desktop, Downloads, Pictures/Screenshots, Movies). ' +
+      'Use this to locate a file the user just took a screenshot of or recorded — returns real filesystem paths that can be passed directly as input_path to frame_screenshot or frame_recording. ' +
+      'This is the FASTEST approach: no file data travels through MCP at all.',
+    inputSchema: {
+      limit: z.number().optional().describe('Max files to return (default 10).'),
+      type: z.enum(['image', 'video', 'any']).optional().describe('Filter by type: image (PNG/JPG/HEIC), video (MP4/MOV), or any (default).'),
+      folder: z.string().optional().describe('Optional extra folder path to scan in addition to the standard locations.'),
+    },
+  },
+  async ({ limit, type, folder }) => {
+    const imageExts = new Set(['.png', '.jpg', '.jpeg', '.heic', '.webp']);
+    const videoExts = new Set(['.mp4', '.mov', '.m4v', '.webm', '.mkv']);
+    const allowed = type === 'image' ? imageExts : type === 'video' ? videoExts : new Set([...imageExts, ...videoExts]);
+    const dirs = [
+      path.join(os.homedir(), 'Desktop'),
+      path.join(os.homedir(), 'Downloads'),
+      path.join(os.homedir(), 'Pictures', 'Screenshots'),
+      path.join(os.homedir(), 'Movies'),
+      path.join(os.homedir(), 'Movies', 'Screen Recordings'),
+    ];
+    if (folder) dirs.push(folder);
+    const files: { filePath: string; mtime: number; size: number }[] = [];
+    for (const dir of dirs) {
+      if (!fs.existsSync(dir)) continue;
+      try {
+        for (const name of fs.readdirSync(dir)) {
+          if (!allowed.has(path.extname(name).toLowerCase())) continue;
+          const fp = path.join(dir, name);
+          try {
+            const st = fs.statSync(fp);
+            if (st.isFile()) files.push({ filePath: fp, mtime: st.mtimeMs, size: st.size });
+          } catch { /* skip unreadable entries */ }
+        }
+      } catch { /* skip unreadable dirs */ }
+    }
+    files.sort((a, b) => b.mtime - a.mtime);
+    const top = files.slice(0, limit ?? 10);
+    if (top.length === 0) return ok('No matching files found in standard locations (Desktop, Downloads, Screenshots, Movies).');
+    const lines = top.map(f =>
+      `${f.filePath}  [${(f.size / 1024).toFixed(0)} KB · ${new Date(f.mtime).toLocaleString()}]`
+    );
+    return ok('Recent files (newest first):\n' + lines.join('\n') + '\n\nPass the desired path as input_path to frame_screenshot or frame_recording.');
+  },
+);
+
+// ── get_clipboard_path ───────────────────────────────────────────────────────
+tool(
+  'get_clipboard_path',
+  {
+    title: 'Get file path from macOS clipboard',
+    description:
+      'Read the filesystem path of the file currently copied in Finder (Cmd+C). Returns a real path that can be passed directly as input_path — no file data travels through MCP. ' +
+      'Workflow: user copies a file in Finder → calls this tool → passes result as input_path to frame_screenshot or frame_recording.',
+    inputSchema: {},
+  },
+  async () => {
+    if (process.platform !== 'darwin') {
+      return fail('get_clipboard_path is only available on macOS.');
+    }
+    try {
+      const raw = execSync(
+        `osascript -e 'POSIX path of (the clipboard as «class furl»)'`,
+        { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
+      ).trim();
+      if (!raw) return fail('No file found in clipboard. Copy a file in Finder with Cmd+C first.');
+      const resolved = path.resolve(raw);
+      if (!fs.existsSync(resolved)) return fail(`Clipboard points to "${resolved}" but the file does not exist.`);
+      return ok(`Clipboard file: ${resolved}\n\nUse input_path: "${resolved}" to frame it.`);
+    } catch {
+      return fail('No file in clipboard, or clipboard contains text/image data instead of a file reference. Copy a file in Finder with Cmd+C, then try again.');
+    }
+  },
+);
+
 // ── list_devices ─────────────────────────────────────────────────────────────
 tool(
   'list_devices',
@@ -203,7 +284,7 @@ tool(
     title: 'Frame a screenshot in a device mockup',
     description:
       'Wrap a still screenshot (PNG/JPG/HEIC) in a pixel-perfect device frame (iPhone, iPad, iMac, Apple Watch). The framed image is returned INLINE (downscaled preview; full resolution goes to output_path). ' +
-      'HOW TO PASS THE IMAGE — in order of preference: (1) input_path = path to a real EXISTING file on the server machine — FASTEST; (2) input_url = a public https URL; (3) for files dropped/attached in the client that have no real path: if the file is < ~500 KB pass it as input_base64; if it is larger, use write_temp_file (chunked upload) and then pass the returned path as input_path. Never invent a path you have not verified.',
+      'HOW TO PASS THE IMAGE — BEST: call find_recent_files or get_clipboard_path to discover a real filesystem path, then use input_path (no data transfer at all). If you already have a path: input_path. If you have a public URL: input_url. Only as last resort: input_base64 for small files (< ~300 KB) — larger files get truncated by the AI and cause corrupt-header errors. Never invent a path you have not verified.',
     inputSchema: {
       input_path: z.string().optional().describe('Path to a real EXISTING screenshot on the machine running this server. Fastest — prefer this when you have a real local path.'),
       input_url: z.string().optional().describe('Public http(s) URL of the screenshot; the server downloads it. Fast.'),
@@ -258,7 +339,7 @@ tool(
     title: 'Frame a screen recording in a device mockup',
     description:
       'Wrap a screen recording (MP4/MOV/…) in a device frame: the device stays still while the screen plays the recording. Output length matches the recording. Defaults to a transparent .mov (HEVC with alpha, ~90× smaller than ProRes, plays in QuickTime/Keynote/Final Cut); set format "mp4" for H.264 on a black background. ' +
-      'HOW TO PASS THE RECORDING — pick one: input_path (existing local file — fastest), input_url (public URL), or for files without a real path use write_temp_file (chunked) then input_path with the result. Never invent a path. Requires ffmpeg. ' +
+      'HOW TO PASS THE RECORDING — BEST: call find_recent_files(type:"video") to discover the real path, then use input_path. If you already have a path: input_path. If you have a public URL: input_url. Never invent a path. Requires ffmpeg. ' +
       'Videos are large — always pass output_path to save to disk; without it the result is returned inline only when under 40 MB.',
     inputSchema: {
       input_base64: z.string().optional().describe('The recording bytes, base64-encoded. Works without a shared filesystem.'),
@@ -330,7 +411,7 @@ tool(
     title: 'Create an App Store screenshot',
     description:
       `Turn a screenshot into a ready-to-upload App Store screenshot at the mandatory ${APPSTORE_SIZE.w}×${APPSTORE_SIZE.h} (iPhone 6.5") size: a headline caption on top (SF Pro Display, auto-contrast color), the framed device below, on a solid background. The result is returned INLINE (downscaled preview; full resolution goes to output_path). ` +
-      'HOW TO PASS THE IMAGE — in order of preference: input_path (a real EXISTING local file — FASTEST), input_url (public URL), or for attached files without a real path: input_base64 if small (< ~500 KB), otherwise use write_temp_file (chunked) then input_path with the result. Never invent a path.',
+      'HOW TO PASS THE IMAGE — BEST: call find_recent_files or get_clipboard_path first to discover a real path, then use input_path (zero data transfer). Fallback: input_url for public URLs. Last resort: input_base64 for small files only (< ~300 KB — larger files get truncated). Never invent a path.',
     inputSchema: {
       input_path: z.string().optional().describe('Path to a real EXISTING screenshot on the server machine. Fastest — prefer this.'),
       input_url: z.string().optional().describe('Public http(s) URL of the screenshot; the server downloads it. Fast.'),
