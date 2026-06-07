@@ -47,6 +47,52 @@ type ContentItem =
 const ok = (text: string) => ({ content: [{ type: 'text' as const, text }] });
 const fail = (text: string) => ({ content: [{ type: 'text' as const, text }], isError: true });
 
+const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.heic', '.webp']);
+const VIDEO_EXTS = new Set(['.mp4', '.mov', '.m4v', '.webm', '.mkv']);
+const SCAN_DIRS = () => [
+  path.join(os.homedir(), 'Desktop'),
+  path.join(os.homedir(), 'Downloads'),
+  path.join(os.homedir(), 'Pictures', 'Screenshots'),
+  path.join(os.homedir(), 'Movies'),
+  path.join(os.homedir(), 'Movies', 'Screen Recordings'),
+];
+
+// Find the most recently modified image or video file in standard locations.
+// Scans each standard dir plus one level of subdirectories (catches ~/Desktop/ProjectX/).
+function findMostRecent(kind: 'image' | 'video'): string | null {
+  const exts = kind === 'image' ? IMAGE_EXTS : VIDEO_EXTS;
+  let best: { filePath: string; mtime: number } | undefined;
+
+  function scanDir(dir: string) {
+    if (!fs.existsSync(dir)) return;
+    try {
+      for (const name of fs.readdirSync(dir)) {
+        const fp = path.join(dir, name);
+        try {
+          const st = fs.statSync(fp);
+          if (st.isFile() && exts.has(path.extname(name).toLowerCase())) {
+            if (!best || st.mtimeMs > best.mtime) best = { filePath: fp, mtime: st.mtimeMs };
+          }
+        } catch { /* skip */ }
+      }
+    } catch { /* skip */ }
+  }
+
+  for (const dir of SCAN_DIRS()) {
+    scanDir(dir);
+    // Also scan one level of subdirectories (e.g. ~/Desktop/ProjectX/)
+    try {
+      for (const sub of fs.readdirSync(dir)) {
+        const subPath = path.join(dir, sub);
+        try {
+          if (fs.statSync(subPath).isDirectory()) scanDir(subPath);
+        } catch { /* skip */ }
+      }
+    } catch { /* skip */ }
+  }
+  return best ? best.filePath : null;
+}
+
 // Resolve an input given ONE of: inline base64 data, a URL, or a filesystem
 // path. base64/URL make the tool work across environment boundaries (sandboxed
 // or containerised agents whose filesystem the MCP server can't see) — the data
@@ -298,16 +344,18 @@ tool(
   {
     title: 'Frame a screenshot in a device mockup',
     description:
-      'Wrap a still screenshot (PNG/JPG/HEIC) in a pixel-perfect device frame (iPhone, iPad, iMac, Apple Watch). The framed image is returned INLINE (downscaled preview; full resolution goes to output_path). ' +
-      'HOW TO PASS THE IMAGE: (1) call find_recent_files() to locate the file on disk, then use input_path — ALWAYS do this first when the user dropped or attached an image; (2) input_path if you already know the real path; (3) input_url for a public URL. Never pass base64 — use find_recent_files or get_clipboard_path instead. Never invent a path you have not verified.',
+      'Wrap a still screenshot (PNG/JPG/HEIC) in a pixel-perfect device frame (iPhone, iPad, iMac, Apple Watch). The framed image is returned INLINE. ' +
+      'INPUT: provide input_path (real local path) or input_url (public URL). ' +
+      'If the user dropped/attached an image and you have no path, omit both — the tool automatically finds and uses the most recently modified image from Desktop/Downloads/Screenshots. ' +
+      'Never pass base64. Never invent paths.',
     inputSchema: {
-      input_path: z.string().optional().describe('Path to a real EXISTING screenshot on the machine running this server.'),
-      input_url: z.string().optional().describe('Public http(s) URL of the screenshot; the server downloads it.'),
+      input_path: z.string().optional().describe('Path to an EXISTING screenshot on this machine. Omit to auto-detect the most recent image.'),
+      input_url: z.string().optional().describe('Public http(s) URL of the screenshot.'),
       device: z.string().optional().describe(`Device frame id (default ${DEFAULT_DEVICE}). Use list_devices to see options.`),
-      color: z.string().optional().describe('Frame color for the device (default: first color of the device).'),
+      color: z.string().optional().describe('Frame color (default: first color of the device).'),
       format: z.enum(['png', 'svg', 'jpeg']).optional().describe('Output format (default png).'),
-      output_path: z.string().optional().describe('Optional path to save the FULL-resolution result on the server machine.'),
-      inline_max_px: z.number().optional().describe('Max long edge of the inline preview image (default 1568; 0 = full resolution inline).'),
+      output_path: z.string().optional().describe('Path to save the full-resolution result. Omit to get inline preview only.'),
+      inline_max_px: z.number().optional().describe('Max long edge of the inline preview (default 1568; 0 = full resolution).'),
     },
   },
   async ({ input_url, input_path, device, color, format, output_path, inline_max_px }) => {
@@ -316,13 +364,23 @@ tool(
     try {
       const fmt: Format = format ?? 'png';
       const ext = fmt === 'svg' ? '.svg' : fmt === 'jpeg' ? '.jpeg' : '.png';
-      input = await resolveInput({ inputUrl: input_url, inputPath: input_path, ext: '.png' });
+
+      // Auto-detect most recent image when no input specified.
+      let autoDetected: string | undefined;
+      if (!input_path && !input_url) {
+        const found = findMostRecent('image');
+        if (!found) return fail('No input specified and no recent images found in Desktop/Downloads/Screenshots. Provide input_path or input_url.');
+        autoDetected = found;
+        input = { path: found, cleanup: () => {}, inline: false };
+      } else {
+        input = await resolveInput({ inputUrl: input_url, inputPath: input_path, ext: '.png' });
+      }
+
       if (detectInputKind(input.path) === 'video') {
         return fail('frame_screenshot is for still images. For a screen recording use frame_recording.');
       }
       const resolved = resolveDeviceColor(device, color);
 
-      // Decide where to write: explicit path, next to a real input, or a temp file.
       let outputPath: string;
       if (output_path) outputPath = path.resolve(output_path);
       else if (!input.inline) outputPath = defaultOutput(input.path, `${resolved.device}_${resolved.color}`, ext);
@@ -330,10 +388,11 @@ tool(
 
       await compose(input.path, resolved.device, outputPath, fmt, resolved.color);
 
+      const autoMsg = autoDetected ? `Auto-detected: ${autoDetected}\n` : '';
       const saved = output_path || !input.inline ? `Saved to ${outputPath}. ` : '';
       return {
         content: [
-          { type: 'text', text: `${saved}Framed ${resolved.device} · ${resolved.color} · ${fmt.toUpperCase()}.` },
+          { type: 'text', text: `${autoMsg}${saved}Framed ${resolved.device} · ${resolved.color} · ${fmt.toUpperCase()}.` },
           await stillContent(outputPath, fmt, inline_max_px ?? 1568),
         ],
       };
@@ -353,11 +412,11 @@ tool(
     title: 'Frame a screen recording in a device mockup',
     description:
       'Wrap a screen recording (MP4/MOV/…) in a device frame: the device stays still while the screen plays the recording. Output length matches the recording. Defaults to a transparent .mov (HEVC with alpha, ~90× smaller than ProRes, plays in QuickTime/Keynote/Final Cut); set format "mp4" for H.264 on a black background. ' +
-      'HOW TO PASS THE RECORDING: (1) call find_recent_files(type:"video") to locate the recording on disk, then use input_path — ALWAYS do this first; (2) input_path if you already know the real path; (3) input_url for a public URL. Never pass base64. Requires ffmpeg. ' +
+      'INPUT: provide input_path (real local path) or input_url (public URL). If you have no path, omit both — the tool automatically finds the most recently modified video in Movies/Downloads. Never pass base64. Requires ffmpeg. ' +
       'Videos are large — always pass output_path to save to disk; without it the result is returned inline only when under 40 MB.',
     inputSchema: {
       input_url: z.string().optional().describe('Public http(s) URL of the recording; the server downloads it.'),
-      input_path: z.string().optional().describe('Path to an EXISTING recording on the server machine (MP4/MOV/M4V/WEBM/MKV/AVI).'),
+      input_path: z.string().optional().describe('Path to an EXISTING recording on this machine. Omit to auto-detect the most recent video.'),
       device: z.string().optional().describe(`Device frame id (default ${DEFAULT_DEVICE}).`),
       color: z.string().optional().describe('Frame color for the device.'),
       format: z.enum(['mov', 'mp4']).optional().describe('mov = transparent HEVC (default); mp4 = H.264 on black.'),
@@ -373,7 +432,16 @@ tool(
         return fail('ffmpeg is required for screen recordings but was not found. Install it with: brew install ffmpeg');
       }
       const ext = format === 'mp4' ? '.mp4' : '.mov';
-      input = await resolveInput({ inputUrl: input_url, inputPath: input_path, ext: '.mp4' });
+
+      let autoDetected: string | undefined;
+      if (!input_path && !input_url) {
+        const found = findMostRecent('video');
+        if (!found) return fail('No input specified and no recent videos found in Movies/Downloads. Provide input_path or input_url.');
+        autoDetected = found;
+        input = { path: found, cleanup: () => {}, inline: false };
+      } else {
+        input = await resolveInput({ inputUrl: input_url, inputPath: input_path, ext: '.mp4' });
+      }
       if (detectInputKind(input.path) !== 'video') {
         return fail('frame_recording is for screen recordings. For a still image use frame_screenshot.');
       }
@@ -394,7 +462,8 @@ tool(
       // Persisted to a real path → just report it. Inline (base64) input with no
       // output_path → return the bytes if small enough, else ask for a path.
       if (output_path || !input.inline) {
-        return ok(`Framed recording saved to ${outputPath} (${resolved.device} · ${resolved.color} · ${kind}).`);
+        const autoMsg = autoDetected ? `Auto-detected: ${autoDetected}\n` : '';
+        return ok(`${autoMsg}Framed recording saved to ${outputPath} (${resolved.device} · ${resolved.color} · ${kind}).`);
       }
       const size = fs.statSync(outputPath).size;
       if (size > 40 * 1024 * 1024) {
