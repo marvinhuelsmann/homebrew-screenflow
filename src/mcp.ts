@@ -61,6 +61,19 @@ async function resolveInput(opts: {
 
   if (inputBase64) {
     const b64 = inputBase64.replace(/^data:[^;]+;base64,/, '');
+    // LLMs silently truncate large verbatim strings in tool calls, producing corrupt files.
+    // Hard-reject anything over ~150 KB of decoded data; callers must use find_recent_files
+    // or get_clipboard_path to get a real path instead.
+    const decodedBytes = Math.floor(b64.length * 0.75);
+    if (decodedBytes > 150_000) {
+      throw new Error(
+        `input_base64 rejected: the encoded data is ~${Math.round(decodedBytes / 1024)} KB — too large. ` +
+        `LLMs truncate large base64 strings, which corrupts the file. ` +
+        `Instead: (1) call find_recent_files() to locate the file by path, then use input_path; ` +
+        `or (2) call get_clipboard_path() if the user copied the file in Finder; ` +
+        `or (3) use input_url if the file is at a public URL.`,
+      );
+    }
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'screenflow-in-'));
     const p = path.join(dir, `input${ext}`);
     fs.writeFileSync(p, Buffer.from(b64, 'base64'));
@@ -88,7 +101,9 @@ async function resolveInput(opts: {
   }
 
   throw new Error(
-    'No input given. Provide exactly one of: input_base64 (preferred — the file bytes, base64-encoded), input_url (a public URL), or input_path (an existing file on the user\'s machine).',
+    'No input given. Best approach: call find_recent_files() to locate the file by path, then pass it as input_path. ' +
+    'Alternatively: input_url for a public URL, or input_path if you already know the real filesystem path. ' +
+    'input_base64 is only accepted for small files (< ~150 KB).',
   );
 }
 
